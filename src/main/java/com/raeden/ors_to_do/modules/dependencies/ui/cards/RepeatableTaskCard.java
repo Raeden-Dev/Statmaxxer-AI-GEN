@@ -5,6 +5,8 @@ import com.raeden.ors_to_do.dependencies.models.Debuff;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
+import com.raeden.ors_to_do.i18n.Lang;
+import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.Design;
 import com.raeden.ors_to_do.modules.dependencies.ui.components.SubTaskRenderer;
 import com.raeden.ors_to_do.modules.dependencies.ui.components.TaskStatsMiniCard;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
@@ -53,15 +55,9 @@ public class RepeatableTaskCard extends VBox {
                 boolean isCompletionLocked = config != null && config.isLockCompletedTasks() && task.isFinished();
 
                 if (isTimeLocked) {
-                    Alert alert = new Alert(Alert.AlertType.WARNING, "This task was created over " + lockHours + " hour(s) ago and is locked from editing.");
-                    alert.setHeaderText("Editing Locked");
-                    TaskDialogs.styleDialog(alert);
-                    alert.show();
+                    Design.warn(Lang.EDIT_LOCKED_HEADER, Lang.EDIT_LOCKED_TASK_BODY, lockHours);
                 } else if (isCompletionLocked) {
-                    Alert alert = new Alert(Alert.AlertType.WARNING, "This task has been completed and is locked from editing by the section settings.");
-                    alert.setHeaderText("Editing Locked");
-                    TaskDialogs.styleDialog(alert);
-                    alert.show();
+                    Design.warn(Lang.EDIT_LOCKED_HEADER, Lang.EDIT_LOCKED_COMPLETED_BODY);
                 } else {
                     TaskDialogs.showEditDialog(task, config, appStats, globalDatabase, onUpdate);
                 }
@@ -146,7 +142,7 @@ public class RepeatableTaskCard extends VBox {
                         if (d.getCurrentTaskCompletions() >= d.getRequiredTaskCompletions()) {
                             it.remove();
                             cleansed = true;
-                            pushNotification("Debuff Cleansed!", "You have overcome: " + d.getName());
+                            pushNotification(Lang.NOTIFY_DEBUFF_CLEANSED_TITLE.get(), Lang.NOTIFY_DEBUFF_CLEANSED_BODY.get(d.getName()));
                         }
                     }
                 }
@@ -174,7 +170,7 @@ public class RepeatableTaskCard extends VBox {
 
         ContextMenu contextMenu = TaskContextMenu.build(task, config, appStats, globalDatabase, onUpdate, null);
 
-        MenuItem resetItem = new MenuItem("Reset Repeating Progress");
+        MenuItem resetItem = new MenuItem(Lang.MENU_RESET_PROGRESS.get());
         resetItem.setOnAction(e -> {
             task.setCurrentCount(0);
             StorageManager.saveTasks(globalDatabase);

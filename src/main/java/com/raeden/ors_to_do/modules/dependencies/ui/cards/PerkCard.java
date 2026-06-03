@@ -5,7 +5,10 @@ import com.raeden.ors_to_do.dependencies.models.CustomStat;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
+import com.raeden.ors_to_do.i18n.Lang;
+import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.Design;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
+import com.raeden.ors_to_do.modules.dependencies.ui.utils.TaskLinkUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -36,11 +39,11 @@ public class PerkCard extends VBox {
             if (foundStat != null) {
                 if (foundStat.getCurrentAmount() < req.getValue()) {
                     meetsRequirements = false;
-                    Label l = new Label("❌ Requires " + req.getValue() + " " + foundStat.getName() + " (Current: " + foundStat.getCurrentAmount() + ")");
+                    Label l = new Label(Lang.REQ_STAT_UNMET.get(req.getValue(), foundStat.getName(), foundStat.getCurrentAmount()));
                     l.setStyle("-fx-text-fill: #FF6666; -fx-font-size: 12px;");
                     requirementsBox.getChildren().add(l);
                 } else {
-                    Label l = new Label("✅ " + req.getValue() + " " + foundStat.getName());
+                    Label l = new Label(Lang.REQ_STAT_MET.get(req.getValue(), foundStat.getName()));
                     l.setStyle("-fx-text-fill: #4EC9B0; -fx-font-size: 12px;");
                     requirementsBox.getChildren().add(l);
                 }
@@ -52,15 +55,18 @@ public class PerkCard extends VBox {
             for (String depId : perkTask.getDependsOnTaskIds()) {
                 TaskItem depTask = globalDatabase.stream().filter(t -> t.getId().equals(depId)).findFirst().orElse(null);
                 if (depTask != null) {
-                    boolean isDepUnlocked = depTask.getPerkLevel() > 0 || depTask.isFinished() || (depTask.getStatRequirements().isEmpty() && (depTask.getDependsOnTaskIds() == null || depTask.getDependsOnTaskIds().isEmpty()));
+                    boolean isDepUnlocked = TaskLinkUtil.isDependencyUnlocked(depTask);
 
                     if (!isDepUnlocked) {
                         meetsRequirements = false;
-                        Label l = new Label("❌ Requires Perk: " + depTask.getTextContent());
+                        // A counter card that isn't at max gets a clearer "x/y" message.
+                        Label l = depTask.isCounterMode()
+                                ? new Label(Lang.REQ_DEP_COUNTER_UNMET.get(depTask.getTextContent(), depTask.getCurrentCount(), depTask.getMaxCount()))
+                                : new Label(Lang.REQ_DEP_PERK_UNMET.get(depTask.getTextContent()));
                         l.setStyle("-fx-text-fill: #FF6666; -fx-font-size: 12px;");
                         requirementsBox.getChildren().add(l);
                     } else {
-                        Label l = new Label("✅ Hooked Perk: " + depTask.getTextContent() + " Unlocked");
+                        Label l = new Label(Lang.DEP_PERK_HOOKED.get(depTask.getTextContent()));
                         l.setStyle("-fx-text-fill: #4EC9B0; -fx-font-size: 12px;");
                         requirementsBox.getChildren().add(l);
                     }
@@ -75,7 +81,7 @@ public class PerkCard extends VBox {
 
         if (isSetupPhase) {
             long minsLeft = Duration.between(LocalDateTime.now(), creationTime.plusMinutes(15)).toMinutes();
-            Label setupLbl = new Label("⏳ Inactive (Setup Phase) - " + (minsLeft + 1) + " mins left");
+            Label setupLbl = new Label(Lang.SETUP_PHASE_INACTIVE.get(minsLeft + 1));
             setupLbl.setStyle("-fx-text-fill: #FFD700; -fx-font-size: 12px; -fx-font-weight: bold;");
             requirementsBox.getChildren().add(0, setupLbl);
         }
@@ -102,12 +108,12 @@ public class PerkCard extends VBox {
 
         // --- Display Dates in UI ---
         if (perkTask.getPerkUnlockedDate() != null) {
-            Label unlockedLbl = new Label("📅 Unlocked: " + perkTask.getPerkUnlockedDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")));
+            Label unlockedLbl = new Label(Lang.PERK_UNLOCKED_ON.get(perkTask.getPerkUnlockedDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"))));
             unlockedLbl.setStyle("-fx-text-fill: #4EC9B0; -fx-font-size: 11px;");
             requirementsBox.getChildren().add(unlockedLbl);
         }
         if (perkTask.getPerkLostDate() != null) {
-            Label lostLbl = new Label("⚠️ Lost: " + perkTask.getPerkLostDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")));
+            Label lostLbl = new Label(Lang.PERK_LOST_ON.get(perkTask.getPerkLostDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"))));
             lostLbl.setStyle("-fx-text-fill: #E06666; -fx-font-size: 11px;");
             requirementsBox.getChildren().add(lostLbl);
         }
@@ -138,7 +144,7 @@ public class PerkCard extends VBox {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Label levelLabel = new Label("Level " + perkTask.getPerkLevel());
+        Label levelLabel = new Label(Lang.LEVEL_LABEL.get(perkTask.getPerkLevel()));
         levelLabel.setStyle("-fx-text-fill: #FFD700; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-color: #332B00; -fx-padding: 3 8; -fx-background-radius: 10;");
         if (isLocked) levelLabel.setVisible(false);
 
@@ -152,18 +158,18 @@ public class PerkCard extends VBox {
         VBox descBox = new VBox(5);
         descBox.setVisible(false);
         descBox.setManaged(false);
-        Label descLabel = new Label(perkTask.getPerkDescription() == null || perkTask.getPerkDescription().isEmpty() ? "No description." : perkTask.getPerkDescription());
+        Label descLabel = new Label(perkTask.getPerkDescription() == null || perkTask.getPerkDescription().isEmpty() ? Lang.NO_DESCRIPTION.get() : perkTask.getPerkDescription());
         descLabel.setStyle("-fx-text-fill: #CCCCCC; -fx-font-size: 13px; -fx-font-style: italic;");
         descLabel.setWrapText(true);
         descBox.getChildren().add(descLabel);
 
-        Button toggleDescBtn = new Button("▼ Show Details");
+        Button toggleDescBtn = new Button(Lang.TOGGLE_SHOW_DETAILS.get());
         toggleDescBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + outlineColor + "; -fx-cursor: hand; -fx-padding: 0;");
         toggleDescBtn.setOnAction(e -> {
             isExpanded = !isExpanded;
             descBox.setVisible(isExpanded);
             descBox.setManaged(isExpanded);
-            toggleDescBtn.setText(isExpanded ? "▲ Hide Details" : "▼ Show Details");
+            toggleDescBtn.setText(isExpanded ? Lang.TOGGLE_HIDE_DETAILS.get() : Lang.TOGGLE_SHOW_DETAILS.get());
         });
 
         getChildren().addAll(header, toggleDescBtn, descBox);
@@ -174,22 +180,17 @@ public class PerkCard extends VBox {
         // --- FIXED: Context Menu for Editing & Deletion ---
         ContextMenu contextMenu = new ContextMenu();
 
-        MenuItem editItem = new MenuItem("Edit Perk");
+        MenuItem editItem = new MenuItem(Lang.MENU_EDIT_PERK.get());
         editItem.setOnAction(e -> openPerkConfigDialog(perkTask, appStats, globalDatabase, onUpdate));
 
-        MenuItem deleteItem = new MenuItem("Permanently Delete Perk");
+        MenuItem deleteItem = new MenuItem(Lang.MENU_DELETE_PERK.get());
         deleteItem.setStyle("-fx-text-fill: #FF6666; -fx-font-weight: bold;");
         deleteItem.setOnAction(e -> {
-            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to permanently delete '" + perkTask.getTextContent() + "'?\n\nThis cannot be undone and stats will not be revoked.", ButtonType.YES, ButtonType.NO);
-            confirm.setHeaderText("Delete Perk");
-            TaskDialogs.styleDialog(confirm);
-            confirm.showAndWait().ifPresent(res -> {
-                if (res == ButtonType.YES) {
-                    globalDatabase.remove(perkTask);
-                    StorageManager.saveTasks(globalDatabase);
-                    onUpdate.run();
-                }
-            });
+            if (Design.confirmedYes(Lang.CONFIRM_DELETE_PERK_HEADER, Lang.CONFIRM_DELETE_PERK_BODY, perkTask.getTextContent())) {
+                globalDatabase.remove(perkTask);
+                StorageManager.saveTasks(globalDatabase);
+                onUpdate.run();
+            }
         });
         contextMenu.getItems().addAll(editItem, new SeparatorMenuItem(), deleteItem);
 
@@ -201,7 +202,7 @@ public class PerkCard extends VBox {
 
     private void openPerkConfigDialog(TaskItem perkTask, AppStats appStats, List<TaskItem> globalDatabase, Runnable onUpdate) {
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Configure Perk: " + perkTask.getTextContent());
+        dialog.setTitle(Lang.DLG_CONFIGURE_PERK_TITLE.get(perkTask.getTextContent()));
         TaskDialogs.styleDialog(dialog);
 
         VBox content = new VBox(15);
@@ -209,17 +210,17 @@ public class PerkCard extends VBox {
 
         // 1. Name & Description
         TextField nameInput = new TextField(perkTask.getTextContent());
-        nameInput.setPromptText("Perk Name");
+        nameInput.setPromptText(Lang.FIELD_PERK_NAME_PROMPT.get());
 
         TextArea descInput = new TextArea(perkTask.getPerkDescription() != null ? perkTask.getPerkDescription() : "");
-        descInput.setPromptText("What does this perk do? (e.g. Grants access to special tasks, buffs a stat, etc.)");
+        descInput.setPromptText(Lang.FIELD_PERK_DESC_PROMPT.get());
         descInput.setPrefRowCount(3);
 
-        content.getChildren().addAll(new Label("Perk Name:"), nameInput, new Label("Perk Effect / Lore Description:"), descInput);
+        content.getChildren().addAll(new Label(Lang.LBL_PERK_NAME.get()), nameInput, new Label(Lang.LBL_PERK_EFFECT.get()), descInput);
 
         // 2. Styling & Icon Section
         content.getChildren().add(new Separator());
-        Label styleLabel = new Label("Perk Appearance & Styling:");
+        Label styleLabel = new Label(Lang.LBL_PERK_APPEARANCE_STYLING.get());
         styleLabel.setStyle("-fx-text-fill: #569CD6; -fx-font-weight: bold;");
         content.getChildren().add(styleLabel);
 
@@ -243,16 +244,16 @@ public class PerkCard extends VBox {
         bgColorPicker.setMaxWidth(Double.MAX_VALUE);
         outlinePicker.setMaxWidth(Double.MAX_VALUE);
 
-        styleGrid.add(new Label("Icon & Color:"), 0, 0);
+        styleGrid.add(new Label(Lang.LBL_ICON_AND_COLOR.get()), 0, 0);
         styleGrid.add(new HBox(10, iconBox, iconColorPicker), 1, 0);
 
-        styleGrid.add(new Label("Background Color:"), 0, 1);
+        styleGrid.add(new Label(Lang.LBL_BACKGROUND_COLOR.get()), 0, 1);
         styleGrid.add(bgColorPicker, 1, 1);
 
-        styleGrid.add(new Label("Outline & Glow Color:"), 0, 2);
+        styleGrid.add(new Label(Lang.LBL_OUTLINE_GLOW_COLOR.get()), 0, 2);
         styleGrid.add(outlinePicker, 1, 2);
 
-        Button randomBtn = new Button("🎲 Randomize Style");
+        Button randomBtn = new Button(Lang.BTN_RANDOMIZE_STYLE.get());
         randomBtn.setMaxWidth(Double.MAX_VALUE);
         randomBtn.setOnAction(e -> {
             java.util.Random rand = new java.util.Random();
@@ -267,7 +268,7 @@ public class PerkCard extends VBox {
 
         // 3. Stat Requirements
         content.getChildren().add(new Separator());
-        Label hookLabel = new Label("Hook Stat Requirements (RPG Thresholds):");
+        Label hookLabel = new Label(Lang.LBL_HOOK_STAT_REQUIREMENTS.get());
         hookLabel.setStyle("-fx-text-fill: #4EC9B0; -fx-font-weight: bold;");
         content.getChildren().add(hookLabel);
 
@@ -287,7 +288,7 @@ public class PerkCard extends VBox {
         amountSpinner.setEditable(true);
         amountSpinner.setMaxWidth(Double.MAX_VALUE); HBox.setHgrow(amountSpinner, Priority.ALWAYS);
 
-        Button addStatBtn = new Button("Add Hook");
+        Button addStatBtn = new Button(Lang.BTN_ADD_HOOK.get());
         addStatBtn.setStyle("-fx-background-color: #0E639C; -fx-text-fill: white;");
 
         statInputBox.getChildren().addAll(statBox, amountSpinner, addStatBtn);
@@ -304,7 +305,7 @@ public class PerkCard extends VBox {
                     HBox row = new HBox(10);
                     row.setAlignment(Pos.CENTER_LEFT);
 
-                    Label l = new Label("• Requires " + req.getValue() + " " + s.getName());
+                    Label l = new Label(Lang.REQ_LINE_BULLET.get(req.getValue(), s.getName()));
                     l.setStyle("-fx-text-fill: #E0E0E0;");
 
                     Button removeBtn = new Button("❌");
@@ -332,11 +333,11 @@ public class PerkCard extends VBox {
 
         // 4. Hook Tasks / Challenges
         content.getChildren().add(new Separator());
-        Label depLabel = new Label("Hook Tasks / Challenges:");
+        Label depLabel = new Label(Lang.LBL_HOOK_TASKS.get());
         depLabel.setStyle("-fx-text-fill: #FFD700; -fx-font-weight: bold;");
         content.getChildren().add(depLabel);
 
-        MenuButton dependenciesMenu = new MenuButton("Select Parent Requirements...");
+        MenuButton dependenciesMenu = new MenuButton(Lang.BTN_SELECT_PARENTS.get());
         dependenciesMenu.getStyleClass().add("custom-menu-btn");
         dependenciesMenu.setMaxWidth(Double.MAX_VALUE);
         List<String> selectedDeps = new ArrayList<>(perkTask.getDependsOnTaskIds());
@@ -350,7 +351,7 @@ public class PerkCard extends VBox {
                 dependenciesMenu.getItems().add(m);
             }
         }
-        Menu othersMenu = new Menu("Other Tasks");
+        Menu othersMenu = new Menu(Lang.MENU_OTHER_TASKS.get());
 
         for (TaskItem other : globalDatabase) {
             if (other.getId().equals(perkTask.getId()) || other.isArchived()) continue;
@@ -363,7 +364,7 @@ public class PerkCard extends VBox {
             cb.setOnAction(e -> {
                 if (cb.isSelected() && !selectedDeps.contains(other.getId())) selectedDeps.add(other.getId());
                 else if (!cb.isSelected()) selectedDeps.remove(other.getId());
-                dependenciesMenu.setText("Hooked Requirements (" + selectedDeps.size() + ")");
+                dependenciesMenu.setText(Lang.HOOKED_REQUIREMENTS_COUNT.get(selectedDeps.size()));
             });
 
             CustomMenuItem item = new CustomMenuItem(cb);
@@ -381,9 +382,9 @@ public class PerkCard extends VBox {
         dependenciesMenu.getItems().removeIf(menuItem -> menuItem instanceof Menu && ((Menu) menuItem).getItems().isEmpty());
         if (!othersMenu.getItems().isEmpty()) dependenciesMenu.getItems().add(othersMenu);
 
-        dependenciesMenu.setText("Hooked Requirements (" + depCount[0] + ")");
+        dependenciesMenu.setText(Lang.HOOKED_REQUIREMENTS_COUNT.get(depCount[0]));
         if (dependenciesMenu.getItems().isEmpty()) {
-            CustomMenuItem emptyItem = new CustomMenuItem(new Label("No other tasks available."));
+            CustomMenuItem emptyItem = new CustomMenuItem(new Label(Lang.NO_OTHER_TASKS.get()));
             emptyItem.setDisable(true);
             dependenciesMenu.getItems().add(emptyItem);
         }
