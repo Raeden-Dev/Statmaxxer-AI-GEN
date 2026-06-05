@@ -4,6 +4,7 @@ import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
+import com.raeden.ors_to_do.modules.dependencies.ui.utils.ColorUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -274,7 +275,7 @@ public class SectionEditDialog {
                 String typedName = ((TextField)nameBox.getChildren().get(1)).getText().trim();
                 if (isNew && typedName.isEmpty()) return;
                 config.setName(typedName.isEmpty() ? "Unnamed Section" : typedName);
-                config.setSidebarColor(toHexString(colorPicker.getValue()));
+                config.setSidebarColor(ColorUtil.toHex(colorPicker.getValue()));
                 config.setResetIntervalHours(intervalSpinner.getValue());
                 config.setHasStreak(streakCheck.isSelected()); config.setAllowManualArchiving(allowManualArchiveCheck.isSelected());
                 config.setEnableSubTasks(enableSubTasksCheck.isSelected()); config.setShowDate(showDateCheck.isSelected());
@@ -304,10 +305,5 @@ public class SectionEditDialog {
         cb.setStyle("-fx-text-fill: white;");
         Label descLabel = new Label(desc); descLabel.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
         return new VBox(2, cb, descLabel);
-    }
-
-    private static String toHexString(Color color) {
-        if (color == null) return null;
-        return String.format("#%02X%02X%02X", (int) (color.getRed() * 255), (int) (color.getGreen() * 255), (int) (color.getBlue() * 255));
     }
 }

@@ -115,7 +115,12 @@ public class RepeatableTaskCard extends VBox {
             });
         }
 
-        Label counterLbl = new Label(String.valueOf(task.getCurrentCount()));
+        // A repeating task can also be a counter (has a target maxCount). When it is, show progress
+        // as "current / max" and stop the + button once the target is reached.
+        boolean hasTarget = task.isCounterMode() && task.getMaxCount() > 0;
+        boolean atTarget = hasTarget && task.getCurrentCount() >= task.getMaxCount();
+
+        Label counterLbl = new Label(hasTarget ? task.getCurrentCount() + " / " + task.getMaxCount() : String.valueOf(task.getCurrentCount()));
         counterLbl.setMinWidth(Region.USE_PREF_SIZE);
         counterLbl.setStyle("-fx-text-fill: #4EC9B0; -fx-font-size: " + metaFontSize + "px; -fx-font-weight: bold; -fx-background-color: #1A332E; -fx-padding: 3 8; -fx-background-radius: 5;");
 
@@ -123,11 +128,17 @@ public class RepeatableTaskCard extends VBox {
         repeatIcon.setMinWidth(Region.USE_PREF_SIZE);
         repeatIcon.setStyle("-fx-text-fill: #569CD6; -fx-font-size: " + (baseFontSize + 2) + "px;");
 
-        Button incBtn = new Button("+");
+        Button incBtn = new Button(atTarget ? "✓" : "+");
         incBtn.setMinWidth(Region.USE_PREF_SIZE);
         incBtn.setStyle("-fx-background-color: #3E3E42; -fx-text-fill: white; -fx-cursor: hand; -fx-font-weight: bold; -fx-border-radius: 3; -fx-background-radius: 3;");
+        if (atTarget) {
+            incBtn.setDisable(true);
+            incBtn.setTooltip(new Tooltip(Lang.COUNTER_TARGET_REACHED.get(task.getMaxCount())));
+        }
 
         incBtn.setOnAction(e -> {
+            // Counter cards must not advance past their target.
+            if (hasTarget && task.getCurrentCount() >= task.getMaxCount()) return;
             task.setCurrentCount(task.getCurrentCount() + 1);
 
             TaskActionHandler.applyInflictedDebuffs(task, appStats);

@@ -1,92 +1,109 @@
 # Suggested Improvements
 
 A running list of concrete, high-value changes for the ORS-To-Do code base. Items are
-roughly ordered by impact-to-effort. Several were surfaced while implementing the
-`Lang`/`LangManager`, `Design`, and challenge/perk refactors.
+roughly ordered by impact-to-effort. Sections marked **✅ Done** were applied in the last pass;
+the remainder is the open backlog.
 
 ---
 
-## 1. Finish the `Lang` / `LangManager` migration across the whole app
+## ✅ Done
 
-The new `com.raeden.ors_to_do.i18n.Lang` enum + `LangManager` now hold the card subsystem's
-copy (Challenge, Perk, Repeatable cards and their dialogs). The rest of the UI still hard-codes
-strings inline — notably the settings panels (`GeneralSettingsPanel`, `StatsManagerPanel`,
-`DangerZonePanel`, …), the services (`BackupManager`, `NotificationManager`,
-`DailyRolloverManager`), and the help/credits/about dialogs in `TaskDialogs`.
+### 1. `Lang` enum + `LangManager` with locale support
+- All sentences in the card / challenge / perk / repeatable subsystem now route through `Lang`.
+- `LangManager` now supports `registerLocale(...)` + `setLocale(...)`, with per-locale partial
+  override tables and graceful fall-back to the enum default. Adding a translation is a single
+  `Map<Lang, String>` registration; no caller changes needed.
+- Migrated additional copy: `TaskDialogs.showCreditsDialog` / `showHelpDialog`, `DynamicModule`
+  empty-states and the "Active Debuffs" header.
 
-**Action:** sweep the remaining files and replace every literal sentence with a `Lang` key.
-Once everything routes through one place, add a `locale` field to `LangManager` so the same keys
-can resolve to different languages — true localization becomes a config switch rather than a rewrite.
+### 2. Shared utilities — `ColorUtil`, `ProgressionService`, `DependencyMenuBuilder`
+- `ColorUtil` is the single source of `Color → "#RRGGBB"` (and the `"transparent"` variant the
+  cards use). Removed the private `toHexString` duplicates from `ChallengeCard`/`ChallengeConfig
+  Dialog`/`PerkCard`/`SectionEditDialog`.
+- `ProgressionService` holds the pure rules: `isDependencyUnlocked`, `meetsRequirements`,
+  `isInSetupPhase`, `recomputePerkState`. `TaskLinkUtil` is now a thin delegate.
+- `DependencyMenuBuilder` builds the "Hook Tasks / Challenges" `MenuButton` shared by both Perk
+  and Challenge editors (deletes ~50 duplicated lines per dialog).
 
-## 2. Extract the shared Perk/Challenge config-dialog code
+### 3. Tests
+- JUnit 4 wired up as a `test` dependency.
+- `ProgressionServiceTest` covers the counter→perk regression, stat-threshold gating, perk
+  unlock/lost transitions, and the setup-phase window (13 tests). Runs via `mvn test` (and was
+  verified offline via `JUnitCore` on this machine).
 
-`PerkCard.openPerkConfigDialog` and `ChallengeConfigDialog.open` are ~80% identical: the
-icon/background/outline color pickers, the "🎲 Randomize Style" button, the stat-requirement
-adder, and the "Hook Tasks / Challenges" dependency menu are duplicated almost verbatim (and
-`toHexString` is copy-pasted into at least three classes).
+### 4. Counter UI enforces the cap
+- `RepeatableTaskCard` shows `x / max` when a target is set, disables the `+` button at the cap,
+  and refuses to advance past max even if clicked.
 
-**Action:** pull these into reusable builders, e.g. a `CardStyleSection`, `StatHookSection`, and
-`DependencyMenuBuilder` under `ui/forms` or `ui/components`, plus a single `ColorUtil.toHex`.
-This removes hundreds of duplicated lines and guarantees the two editors stay in sync.
+### 5. Design class for long/design dialogs
+- `Design.confirmedYes(...)` / `Design.warn(...)` / `Design.error(...)`. All card delete /
+  fail / complete / edit-lock dialogs route through it. Copy comes from `Lang`; styling from
+  `TaskDialogs.styleDialog`.
 
-## 3. Move game logic out of view constructors into a testable service layer
+### 6. Split `ChallengeCard` below the 500-line god-class threshold
+- Was 631 lines; now `ChallengeCard` (view, ~340) + `ChallengeConfigDialog` (editor, ~340).
 
-`PerkCard`'s constructor evaluates unlock requirements **and mutates the model** (sets
-`perkUnlockedDate`/`perkLostDate`/`perkLevel`) and calls `StorageManager.saveTasks(...)` as a
-side effect of *rendering*. Computing-and-persisting state during UI construction is fragile and
-order-dependent, and it's exactly why the counter-card unlock bug (now fixed in
-`TaskLinkUtil.isDependencyUnlocked`) was hard to spot.
+### 7. Fail Challenge button + counter→perk bug fix
+- Challenge cards expose a **Fail Challenge** action; failed challenges show a "💀 Failed on" stamp
+  and a dimmed-red style.
+- `ProgressionService.isDependencyUnlocked` requires counter cards to reach their target before
+  they count as satisfied — fixes the reported bug.
 
-**Action:** introduce a `PerkService` / `ProgressionService` that owns "is this unlocked?" and
-"recompute unlock state" as pure, unit-testable methods. Cards should only read the result and draw.
+---
 
-## 4. Add automated tests — starting with progression/dependency rules
+## 🟡 Backlog
 
-There is currently no test source set at all. The counter→perk bug would have been caught by a
-single unit test asserting that a counter card at `currentCount < maxCount` does **not** satisfy a
-dependent perk.
+### 8. Finish the `Lang` migration outside the card subsystem
+Settings panels (`GeneralSettingsPanel`, `StatsManagerPanel`, `DangerZonePanel`, `Priority
+ManagerPanel`, `TemplateEditDialog`, …), services (`BackupManager`, `NotificationManager`,
+`DailyRolloverManager`), and the help-card body strings still hold inline literals.
 
-**Action:** add JUnit 5 under `src/test/java`, and cover `isDependencyUnlocked`, the stat-threshold
-checks, deadline/expiry logic, and the daily-rollover behavior. Wire `mvn test` into the build.
+**Action.** Sweep one panel at a time; add `Lang` keys per group; verify with a quick translation
+table.
 
-## 5. Replace Java serialization with JSON persistence
+### 9. Move progression logic *fully* out of the view layer
+`PerkCard` still calls `ProgressionService.recomputePerkState(...)` **and** `StorageManager.save
+Tasks(...)` during construction. The pure rule is now testable, but the side-effect remains
+order-sensitive (re-rendering the same perk twice in one tick can re-stamp dates). See
+[`potential_bugs.md`](potential_bugs.md) #5.
 
-Models implement `Serializable` with a fixed `serialVersionUID`. Java serialization is brittle:
-renaming/moving a class or changing field shapes can silently break loading of existing user data,
-and the `.dat` files are opaque (hard to back up, diff, or hand-repair).
+**Action.** Centralize "recompute & save" in the daily-rollover/app-tick path; let the card only
+**read** the model.
 
-**Action:** migrate `StorageManager` to a JSON format (Gson or Jackson). Benefits: refactor-safe
-field evolution, human-readable backups (`BackupManager`/`BackupBundle` already exist), and easier
-import/export. Provide a one-time migration that reads the old serialized format and rewrites JSON.
+### 10. Bug fixes from `potential_bugs.md`
+Highest priority cluster:
+- #1 priority `.get(1)` crash when only one priority exists
+- #2 challenges getting auto-levelled as perks on Monday rollover
+- #3 failed challenges still satisfying hooked dependencies
+- #4 daily rollover finishing & archiving counter / repeating tasks
+- #6 wrong task flagged as challenge on a Challenge page
 
-## 6. Keep splitting classes that are trending toward "god class" status
+These compound on each other — fix together rather than in isolation.
 
-`ChallengeCard` was split (631 → 340 + a 340-line dialog) to stay under the 500-line budget. A few
-others are approaching the line and mix several responsibilities:
-
-- `PomodoroTimer` (459) — timer state machine + UI + notifications.
-- `AppStats` (393) — a data model that has grown into a grab-bag of unrelated settings.
+### 11. Keep splitting classes that are trending toward "god class" status
+`ChallengeCard` was the only file >500 lines. Watch the next-largest:
+- `PomodoroTimer` (459) — timer + UI + notifications.
+- `AppStats` (393+) — data model has become a grab-bag of display + RPG + paths.
 - `FilterSortHeader` (362), `GeneralSettingsPanel` (362), `TemplateEditDialog` (361).
 
-**Action:** adopt a soft 300-line / single-responsibility guideline for UI classes and split when a
-class starts owning both layout and behavior. `AppStats` in particular would benefit from grouping
-its fields into cohesive sub-objects (e.g. `DisplaySettings`, `RpgSettings`).
+**Action.** Soft 300-line guideline for UI classes; split when a class owns both layout and
+behavior. For `AppStats`, group fields into cohesive sub-objects (`DisplaySettings`,
+`RpgSettings`, `StreakSettings`).
 
-## 7. Enforce the counter card's maximum in the UI
+### 12. Broaden test coverage
+- `ProgressionServiceTest` is a template; add equivalents for `DailyRolloverManager` (covers #2,
+  #4, #9 from the bug doc), `TaskActionHandler.processRPGStats`, and `ColorUtil`.
+- A small fake `StorageManager` (interface + in-memory impl) would let the rollover/action tests
+  run without touching `%APPDATA%`.
 
-`TaskItem` has `maxCount`, and `TaskActionHandler` finishes a counter task when
-`currentCount >= maxCount`, but `RepeatableTaskCard`'s `+` button increments with no visible target
-and no stop at the cap. Now that counter completion gates perk unlocks, the user can't easily see
-progress.
-
-**Action:** show `currentCount / maxCount` (a small progress bar would be ideal) on the repeatable
-card, disable/relabel the `+` button at max, and make the "at max = done" state obvious.
+### 13. (Originally on this list, **superseded**) ~~Migrate `StorageManager` off Java serialization to JSON~~
+Already JSON via Gson — only the migration path from `.dat` legacy files still uses Java
+serialization. Models still implement `Serializable` only for that fallback; safe to delete the
+`Serializable` markers and `loadLegacyDat(...)` after a deprecation window.
 
 ---
 
-### Already addressed in this pass
-- Centralized card/dialog copy in `Lang` + `LangManager`.
-- New `Design` class as the single home for long-string / confirmation dialogs.
-- Split `ChallengeCard` below the 500-line god-class threshold (`ChallengeConfigDialog`).
-- Added a **Fail Challenge** button alongside **Challenge Done**.
-- Fixed counter-card → perk unlock (`TaskLinkUtil.isDependencyUnlocked`).
+## Reference
+
+- [`section_bug_hunting.md`](section_bug_hunting.md) — section option combinations worth testing.
+- [`potential_bugs.md`](potential_bugs.md) — twelve concrete defects with repro steps.

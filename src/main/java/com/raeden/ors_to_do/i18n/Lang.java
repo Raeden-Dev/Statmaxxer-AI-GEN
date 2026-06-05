@@ -81,6 +81,7 @@ public enum Lang {
     MENU_EDIT_PERK("Edit Perk"),
     MENU_DELETE_PERK("Permanently Delete Perk"),
     MENU_RESET_PROGRESS("Reset Repeating Progress"),
+    COUNTER_TARGET_REACHED("Target reached ({0}/{0})"),
 
     // ---------------------------------------------------------------------
     // Confirmation dialogs
@@ -135,6 +136,28 @@ public enum Lang {
     MENU_OTHER_TASKS("Other Tasks"),
     HOOKED_REQUIREMENTS_COUNT("Hooked Requirements ({0})"),
     NO_OTHER_TASKS("No other tasks available."),
+
+    // ---------------------------------------------------------------------
+    // Empty-state messages (DynamicModule)
+    // ---------------------------------------------------------------------
+    EMPTY_NOTES("Add a note to your board!"),
+    EMPTY_REWARDS("Add a reward to your shop!"),
+    EMPTY_TASKS("Add a task to get started!"),
+    EMPTY_PERKS("Type a perk name in the bar below and click 'Add' to create your first Skill Tree Perk!"),
+    EMPTY_CHALLENGES("Type a challenge name below to create a new conquerable Challenge!"),
+    DEBUFFS_TITLE("Active Debuffs"),
+    NO_DEBUFFS("You are completely healthy."),
+    NO_CUSTOM_STATS("No custom stats available. Go to Settings to create them."),
+
+    // ---------------------------------------------------------------------
+    // About / Help / Credits (TaskDialogs)
+    // ---------------------------------------------------------------------
+    ABOUT_CREDITS_TITLE("About & Credits ({0})"),
+    APP_NAME("Task Tracker"),
+    ABOUT_CREDITS_BODY("Developed for anyone who wants to keep track of everything in their life.\n\n"
+            + "Credits @Sadman Sakib - One Raid Studio"),
+    HELP_TITLE("Application Help Guide"),
+    HELP_HEADER("How to use the application: ({0})"),
 
     // ---------------------------------------------------------------------
     // Misc / generic

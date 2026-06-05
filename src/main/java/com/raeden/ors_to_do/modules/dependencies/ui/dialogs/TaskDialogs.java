@@ -3,6 +3,7 @@ package com.raeden.ors_to_do.modules.dependencies.ui.dialogs;
 import com.raeden.ors_to_do.TaskTrackerApp;
 import com.raeden.ors_to_do.dependencies.models.*;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
+import com.raeden.ors_to_do.i18n.Lang;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
@@ -47,20 +48,17 @@ public class TaskDialogs {
 
     public static void showCreditsDialog() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("About & Credits (" + APP_VERSION + ")");
-        alert.setHeaderText("Task Tracker");
-        alert.setContentText(
-                "Developed for anyone who wants to keep track of everything in their life.\n\n" +
-                        "Credits @Sadman Sakib - One Raid Studio"
-        );
+        alert.setTitle(Lang.ABOUT_CREDITS_TITLE.get(APP_VERSION));
+        alert.setHeaderText(Lang.APP_NAME.get());
+        alert.setContentText(Lang.ABOUT_CREDITS_BODY.get());
         styleDialog(alert);
         alert.show();
     }
 
     public static void showHelpDialog(AppStats stats) {
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Application Help Guide");
-        dialog.setHeaderText("How to use the application: (" + APP_VERSION + ")");
+        dialog.setTitle(Lang.HELP_TITLE.get());
+        dialog.setHeaderText(Lang.HELP_HEADER.get(APP_VERSION));
         styleDialog(dialog);
 
         VBox contentBox = new VBox(15);

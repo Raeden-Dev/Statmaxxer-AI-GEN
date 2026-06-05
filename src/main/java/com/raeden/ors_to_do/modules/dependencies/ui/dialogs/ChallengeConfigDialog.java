@@ -2,10 +2,11 @@ package com.raeden.ors_to_do.modules.dependencies.ui.dialogs;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.CustomStat;
-import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.i18n.Lang;
+import com.raeden.ors_to_do.modules.dependencies.ui.components.DependencyMenuBuilder;
+import com.raeden.ors_to_do.modules.dependencies.ui.utils.ColorUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -221,57 +222,8 @@ public final class ChallengeConfigDialog {
         depLabel.setStyle("-fx-text-fill: #FFD700; -fx-font-weight: bold;");
         content.getChildren().add(depLabel);
 
-        MenuButton dependenciesMenu = new MenuButton(Lang.BTN_SELECT_PARENTS.get());
-        dependenciesMenu.getStyleClass().add("custom-menu-btn");
-        dependenciesMenu.setMaxWidth(Double.MAX_VALUE);
         List<String> selectedDeps = new ArrayList<>(challengeTask.getDependsOnTaskIds());
-        int[] depCount = {0};
-
-        Map<String, Menu> sectionMenus = new HashMap<>();
-        if (appStats != null && appStats.getSections() != null) {
-            for (SectionConfig sc : appStats.getSections()) {
-                Menu m = new Menu(sc.getName());
-                sectionMenus.put(sc.getId(), m);
-                dependenciesMenu.getItems().add(m);
-            }
-        }
-        Menu othersMenu = new Menu(Lang.MENU_OTHER_TASKS.get());
-
-        for (TaskItem other : globalDatabase) {
-            if (other.getId().equals(challengeTask.getId()) || other.isArchived()) continue;
-
-            CheckBox cb = new CheckBox(other.getTextContent());
-            cb.setStyle("-fx-text-fill: white;");
-            cb.setSelected(selectedDeps.contains(other.getId()));
-            if (cb.isSelected()) depCount[0]++;
-
-            cb.setOnAction(e -> {
-                if (cb.isSelected() && !selectedDeps.contains(other.getId())) selectedDeps.add(other.getId());
-                else if (!cb.isSelected()) selectedDeps.remove(other.getId());
-                dependenciesMenu.setText(Lang.HOOKED_REQUIREMENTS_COUNT.get(selectedDeps.size()));
-            });
-
-            CustomMenuItem item = new CustomMenuItem(cb);
-            item.setHideOnClick(false);
-
-            Menu targetMenu = sectionMenus.get(other.getSectionId());
-            if (targetMenu != null) {
-                targetMenu.getItems().add(item);
-            } else {
-                othersMenu.getItems().add(item);
-            }
-        }
-
-        dependenciesMenu.getItems().removeIf(menuItem -> menuItem instanceof Menu && ((Menu) menuItem).getItems().isEmpty());
-        if (!othersMenu.getItems().isEmpty()) dependenciesMenu.getItems().add(othersMenu);
-
-        dependenciesMenu.setText(Lang.HOOKED_REQUIREMENTS_COUNT.get(depCount[0]));
-        if (dependenciesMenu.getItems().isEmpty()) {
-            CustomMenuItem emptyItem = new CustomMenuItem(new Label(Lang.NO_OTHER_TASKS.get()));
-            emptyItem.setDisable(true);
-            dependenciesMenu.getItems().add(emptyItem);
-        }
-
+        MenuButton dependenciesMenu = DependencyMenuBuilder.build(challengeTask, appStats, globalDatabase, selectedDeps);
         content.getChildren().add(dependenciesMenu);
 
         ScrollPane scrollPane = new ScrollPane(content);
@@ -293,9 +245,9 @@ public final class ChallengeConfigDialog {
                 challengeTask.setTextContent(nameInput.getText().trim());
                 challengeTask.setPerkDescription(descInput.getText().trim());
                 challengeTask.setIconSymbol(iconBox.getValue());
-                challengeTask.setIconColor(toHexString(iconColorPicker.getValue()));
-                challengeTask.setColorHex(toHexString(bgColorPicker.getValue()));
-                challengeTask.setCustomOutlineColor(toHexString(outlinePicker.getValue()));
+                challengeTask.setIconColor(ColorUtil.toHexOrTransparent(iconColorPicker.getValue()));
+                challengeTask.setColorHex(ColorUtil.toHexOrTransparent(bgColorPicker.getValue()));
+                challengeTask.setCustomOutlineColor(ColorUtil.toHexOrTransparent(outlinePicker.getValue()));
                 challengeTask.setDependsOnTaskIds(selectedDeps);
 
                 if (datePicker.getValue() != null) {
@@ -331,10 +283,5 @@ public final class ChallengeConfigDialog {
                 onUpdate.run();
             }
         });
-    }
-
-    private static String toHexString(Color color) {
-        if (color == null || color.getOpacity() == 0.0) return "transparent";
-        return String.format("#%02X%02X%02X", (int) (color.getRed() * 255), (int) (color.getGreen() * 255), (int) (color.getBlue() * 255));
     }
 }

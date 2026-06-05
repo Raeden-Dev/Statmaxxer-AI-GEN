@@ -6,6 +6,7 @@ import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.CustomStat;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
+import com.raeden.ors_to_do.i18n.Lang;
 import com.raeden.ors_to_do.modules.dependencies.ui.cards.ChallengeCard;
 import com.raeden.ors_to_do.modules.dependencies.ui.cards.DebuffCard;
 import com.raeden.ors_to_do.modules.dependencies.ui.cards.PerkCard;
@@ -167,7 +168,7 @@ public class DynamicModule extends StackPane {
         filterSortHeader.updateBadges(availableCount, completedCount);
 
         if (tasksToDisplay.isEmpty()) {
-            String emptyText = config.isNotesPage() ? "Add a note to your board!" : (config.isRewardsPage() ? "Add a reward to your shop!" : "Add a task to get started!");
+            String emptyText = config.isNotesPage() ? Lang.EMPTY_NOTES.get() : (config.isRewardsPage() ? Lang.EMPTY_REWARDS.get() : Lang.EMPTY_TASKS.get());
             Label emptyLabel = new Label(emptyText);
             emptyLabel.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
             emptyLabel.setMaxWidth(Double.MAX_VALUE);
@@ -193,7 +194,7 @@ public class DynamicModule extends StackPane {
         if (changed) StorageManager.saveStats(appStats);
 
         // --- FIXED: Removed the Debuff Manager button from here since it's now in the header ---
-        Label debuffLabel = new Label("Active Debuffs");
+        Label debuffLabel = new Label(Lang.DEBUFFS_TITLE.get());
         debuffLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #FF6666; -fx-padding: 0 0 5 0;");
         listContainer.getChildren().add(debuffLabel);
 
@@ -203,7 +204,7 @@ public class DynamicModule extends StackPane {
         }
 
         if (appStats.getActiveDebuffs().isEmpty()) {
-            Label noDebuffs = new Label("You are completely healthy.");
+            Label noDebuffs = new Label(Lang.NO_DEBUFFS.get());
             noDebuffs.setStyle("-fx-text-fill: #858585; -fx-font-style: italic;");
             debuffBox.getChildren().add(noDebuffs);
         }
@@ -221,7 +222,7 @@ public class DynamicModule extends StackPane {
         listContainer.getChildren().addAll(debuffScroll, new Separator());
 
         if (!appStats.isGlobalStatsEnabled() || appStats.getCustomStats().isEmpty()) {
-            Label emptyMsg = new Label("No custom stats available. Go to Settings to create them.");
+            Label emptyMsg = new Label(Lang.NO_CUSTOM_STATS.get());
             emptyMsg.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);
             listContainer.getChildren().add(emptyMsg);
@@ -251,7 +252,7 @@ public class DynamicModule extends StackPane {
         DynamicSortHelper.sortTasks(perks, filterSortHeader.getSortMode(), config, appStats);
 
         if (perks.isEmpty()) {
-            Label emptyMsg = new Label("Type a perk name in the bar below and click 'Add' to create your first Skill Tree Perk!");
+            Label emptyMsg = new Label(Lang.EMPTY_PERKS.get());
             emptyMsg.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);
             listContainer.getChildren().add(emptyMsg);
@@ -279,7 +280,7 @@ public class DynamicModule extends StackPane {
         DynamicSortHelper.sortTasks(challenges, filterSortHeader.getSortMode(), config, appStats);
 
         if (challenges.isEmpty()) {
-            Label emptyMsg = new Label("Type a challenge name below to create a new conquerable Challenge!");
+            Label emptyMsg = new Label(Lang.EMPTY_CHALLENGES.get());
             emptyMsg.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);
             listContainer.getChildren().add(emptyMsg);
