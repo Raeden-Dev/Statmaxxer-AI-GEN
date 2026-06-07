@@ -71,7 +71,21 @@ public class SectionEditDialog {
             }
         });
         VBox intervalBox = new VBox(5, new Label("Reset Interval (Hours):"), intervalSpinner);
-        basicInfoRow.getChildren().addAll(nameBox, colorBox, intervalBox);
+
+        // --- Per-section "Prevent Editing (Hours)" (formerly a global setting). 0 = disabled. ---
+        Spinner<Integer> preventEditingSpinner = new Spinner<>(0, 8760, config.getPreventEditingHours());
+        preventEditingSpinner.setEditable(true); preventEditingSpinner.setPrefWidth(80);
+        preventEditingSpinner.getEditor().focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (!isNowFocused) {
+                try { preventEditingSpinner.getValueFactory().setValue(Integer.parseInt(preventEditingSpinner.getEditor().getText().trim())); }
+                catch (NumberFormatException e) { preventEditingSpinner.getEditor().setText(String.valueOf(preventEditingSpinner.getValue())); }
+            }
+        });
+        Label preventEditingLabel = new Label("Prevent Editing After (Hours):");
+        Tooltip.install(preventEditingLabel, new Tooltip("Hours after creation before tasks in this section are permanently locked from being edited. 0 disables the lock."));
+        VBox preventEditingBox = new VBox(5, preventEditingLabel, preventEditingSpinner);
+
+        basicInfoRow.getChildren().addAll(nameBox, colorBox, intervalBox, preventEditingBox);
         content.getChildren().addAll(basicInfoRow, new Separator());
 
         // --- Features Grid ---
@@ -107,6 +121,10 @@ public class SectionEditDialog {
         // --- NEW: Lock Task Checkbox ---
         CheckBox lockCompletedCheck = new CheckBox("Lock Task After Completion"); lockCompletedCheck.setSelected(config.isLockCompletedTasks());
 
+        // --- NEW: Categories toggle ---
+        CheckBox enableCategoriesCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.CATEGORY_ENABLE_TOGGLE.get());
+        enableCategoriesCheck.setSelected(config.isEnableCategories());
+
         featuresGrid.add(createToggle(allowManualArchiveCheck, "Enables right-click to send tasks to Archive."), 0, 0);
         featuresGrid.add(createToggle(enableSubTasksCheck, "Allows creating nested to-do items inside a card."), 0, 1);
         featuresGrid.add(createToggle(showDateCheck, "Displays the exact date the task was generated."), 0, 2);
@@ -131,6 +149,7 @@ public class SectionEditDialog {
         featuresGrid.add(createToggle(enableOptionalTasksCheck, "Allows tasks that grant bonus points but do not count to totals."), 1, 8);
         featuresGrid.add(createToggle(enableLinkCardsCheck, "Allows creating tasks that act purely as clickable shortcuts."), 1, 9);
         featuresGrid.add(createToggle(allowRepeatingTasksCheck, "Turns cards into unlimited clickers to farm stats/points."), 1, 10);
+        featuresGrid.add(createToggle(enableCategoriesCheck, com.raeden.ors_to_do.i18n.Lang.CATEGORY_ENABLE_DESC.get()), 1, 11);
 
         content.getChildren().addAll(featuresGrid, new Separator());
 
@@ -219,6 +238,8 @@ public class SectionEditDialog {
 
                 // --- NEW: Load preset lock state ---
                 lockCompletedCheck.setSelected(p.isLockCompletedTasks());
+                enableCategoriesCheck.setSelected(p.isEnableCategories());
+                preventEditingSpinner.getValueFactory().setValue(p.getPreventEditingHours());
 
                 updateUIState.run();
             }
@@ -248,6 +269,8 @@ public class SectionEditDialog {
 
                 // --- NEW: Save preset lock state ---
                 newPreset.setLockCompletedTasks(lockCompletedCheck.isSelected());
+                newPreset.setEnableCategories(enableCategoriesCheck.isSelected());
+                newPreset.setPreventEditingHours(preventEditingSpinner.getValue());
 
                 appStats.getSectionPresets().add(newPreset); presetBox.getItems().add(newPreset); presetBox.setValue(newPreset);
                 StorageManager.saveStats(appStats);
@@ -294,6 +317,12 @@ public class SectionEditDialog {
 
                 // --- NEW: Save Lock State ---
                 config.setLockCompletedTasks(lockCompletedCheck.isSelected());
+
+                // --- Per-section prevent-editing window ---
+                config.setPreventEditingHours(preventEditingSpinner.getValue());
+
+                // --- Categories toggle ---
+                config.setEnableCategories(enableCategoriesCheck.isSelected());
 
                 if (isNew) appStats.getSections().add(config);
                 onSave.run();

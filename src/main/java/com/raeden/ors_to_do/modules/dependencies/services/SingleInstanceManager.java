@@ -1,6 +1,5 @@
 package com.raeden.ors_to_do.modules.dependencies.services;
 
-import javafx.application.Platform;
 import javafx.stage.Stage;
 
 import java.io.BufferedReader;
@@ -31,17 +30,12 @@ public class SingleInstanceManager {
 
                         String msg = in.readLine();
                         if ("FOCUS".equals(msg)) {
-                            // Another instance of THIS version tried to launch. Bring our window to the front.
-                            Platform.runLater(() -> {
-                                if (mainStage != null) {
-                                    if (mainStage.isIconified()) {
-                                        mainStage.setIconified(false);
-                                    }
-                                    mainStage.show();
-                                    mainStage.toFront();
-                                    mainStage.requestFocus();
-                                }
-                            });
+                            // Another instance of THIS version tried to launch. The plain
+                            // Platform.runLater(() -> mainStage.show(); toFront()) sequence is
+                            // unreliable on Windows: the "foreground lock" lets the call succeed
+                            // silently while leaving the window buried. WindowRestorer applies the
+                            // alwaysOnTop-flip trick that actually works.
+                            WindowRestorer.surface(mainStage);
                         }
                     } catch (Exception e) {
                         e.printStackTrace();

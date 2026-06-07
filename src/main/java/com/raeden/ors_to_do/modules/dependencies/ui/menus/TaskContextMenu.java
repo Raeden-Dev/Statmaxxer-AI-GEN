@@ -280,7 +280,8 @@ public class TaskContextMenu {
         );
 
         contextMenu.setOnShowing(e -> {
-            int lockHours = appStats.getPreventEditingHours();
+            // Per-section prevent-editing window (formerly a global setting).
+            int lockHours = config != null ? config.getPreventEditingHours() : 0;
             boolean isTimeLocked = !(isNoteMode || isRewardMode) && lockHours > 0 && java.time.LocalDateTime.now().isAfter(task.getDateCreated().plusHours(lockHours));
 
             // Apply lock if time expired OR if the task is completed and the section enforces completion locks

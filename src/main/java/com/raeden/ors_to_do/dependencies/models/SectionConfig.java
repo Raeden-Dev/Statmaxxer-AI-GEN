@@ -51,6 +51,20 @@ public class SectionConfig implements Serializable {
     // --- NEW: Lock Task After Completion Flag ---
     private boolean lockCompletedTasks = false;
 
+    // --- NEW: per-section "Prevent Editing (Hours)" (moved from AppStats so it can be turned
+    // on/off per section instead of being a global hammer). 0 = disabled.
+    private int preventEditingHours = 0;
+
+    // --- NEW: per-section category support
+    private boolean enableCategories = false;
+
+    /**
+     * Optional visual customization for category bars. Keyed by category name. Categories without
+     * a matching entry render in the default dark theme. Kept as a list (not a map) for clean
+     * Gson round-tripping with the existing serializer.
+     */
+    private List<CategoryStyle> categoryStyles = new ArrayList<>();
+
     private List<DailyTemplate> autoAddTemplates = new ArrayList<>();
 
     public SectionConfig(String id, String name) {
@@ -160,6 +174,92 @@ public class SectionConfig implements Serializable {
     // --- NEW: Getter & Setter for Lock Completed Tasks ---
     public boolean isLockCompletedTasks() { return lockCompletedTasks; }
     public void setLockCompletedTasks(boolean lockCompletedTasks) { this.lockCompletedTasks = lockCompletedTasks; }
+
+    public int getPreventEditingHours() { return preventEditingHours; }
+    public void setPreventEditingHours(int preventEditingHours) { this.preventEditingHours = preventEditingHours; }
+
+    public boolean isEnableCategories() { return enableCategories; }
+    public void setEnableCategories(boolean enableCategories) { this.enableCategories = enableCategories; }
+
+    public List<CategoryStyle> getCategoryStyles() {
+        if (categoryStyles == null) categoryStyles = new ArrayList<>();
+        return categoryStyles;
+    }
+
+    /** @return the {@link CategoryStyle} for {@code name}, or null if none has been customized. */
+    public CategoryStyle findCategoryStyle(String name) {
+        if (name == null) return null;
+        for (CategoryStyle s : getCategoryStyles()) {
+            if (name.equals(s.getName())) return s;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the existing style for {@code name}, or creates+stores a blank one if missing.
+     * Used by the customization dialog so callers can mutate the returned object directly.
+     */
+    public CategoryStyle upsertCategoryStyle(String name) {
+        CategoryStyle existing = findCategoryStyle(name);
+        if (existing != null) return existing;
+        CategoryStyle created = new CategoryStyle(name);
+        getCategoryStyles().add(created);
+        return created;
+    }
+
+    /** Drops the style for {@code name} if present (used by the "Reset to Default" path). */
+    public void removeCategoryStyle(String name) {
+        if (name == null) return;
+        getCategoryStyles().removeIf(s -> name.equals(s.getName()));
+    }
+
+    /**
+     * Renames a category in this section: rewrites the {@code categoryName} of every task in
+     * {@code tasks} that belongs to this section and matches {@code oldName}, migrates the
+     * persisted collapse state, and re-keys the {@link CategoryStyle} entry. If a style already
+     * exists under {@code newName} (i.e. the user is merging categories), the old style is dropped
+     * and the existing one wins.
+     *
+     * @return true if anything changed
+     */
+    public boolean renameCategory(String oldName, String newName, List<TaskItem> tasks, AppStats appStats) {
+        if (oldName == null || newName == null) return false;
+        String trimmedNew = newName.trim();
+        if (trimmedNew.isEmpty() || trimmedNew.equals(oldName)) return false;
+
+        boolean changed = false;
+
+        if (tasks != null) {
+            for (TaskItem t : tasks) {
+                if (id.equals(t.getSectionId()) && oldName.equals(t.getCategoryName())) {
+                    t.setCategoryName(trimmedNew);
+                    changed = true;
+                }
+            }
+        }
+
+        if (appStats != null) {
+            boolean wasCollapsed = appStats.isCategoryCollapsed(id, oldName);
+            if (wasCollapsed || appStats.getCollapsedCategories().containsKey(id)) {
+                appStats.setCategoryCollapsed(id, oldName, false);
+                if (wasCollapsed) appStats.setCategoryCollapsed(id, trimmedNew, true);
+            }
+        }
+
+        CategoryStyle oldStyle = findCategoryStyle(oldName);
+        if (oldStyle != null) {
+            CategoryStyle clash = findCategoryStyle(trimmedNew);
+            if (clash != null) {
+                // Merge: the destination's style wins; we just drop the old key.
+                getCategoryStyles().remove(oldStyle);
+            } else {
+                oldStyle.setName(trimmedNew);
+            }
+            changed = true;
+        }
+
+        return changed;
+    }
 
     public List<DailyTemplate> getAutoAddTemplates() {
         if (autoAddTemplates == null) {

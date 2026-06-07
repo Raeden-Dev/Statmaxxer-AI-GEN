@@ -6,9 +6,12 @@ import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.i18n.Lang;
 import javafx.scene.control.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Builds the "Hook Tasks / Challenges" multi-select {@link MenuButton} shared by the Perk and
@@ -20,6 +23,24 @@ import java.util.Map;
 public final class DependencyMenuBuilder {
 
     private DependencyMenuBuilder() { }
+
+    /**
+     * Returns a copy of {@code selectedDeps} containing only ids that still exist in
+     * {@code globalDatabase}. While an editor dialog was open, the user (or a background process)
+     * may have deleted one of the hooked tasks; without this filter, the editor would persist a
+     * dead id that nothing can ever satisfy. Callers should run this just before saving the
+     * dependency list to the model.
+     */
+    public static List<String> stripStale(List<String> selectedDeps, List<TaskItem> globalDatabase) {
+        if (selectedDeps == null) return new ArrayList<>();
+        Set<String> alive = new HashSet<>();
+        if (globalDatabase != null) {
+            for (TaskItem t : globalDatabase) if (t != null) alive.add(t.getId());
+        }
+        List<String> out = new ArrayList<>(selectedDeps.size());
+        for (String id : selectedDeps) if (alive.contains(id)) out.add(id);
+        return out;
+    }
 
     /**
      * @param owner         the task being edited (excluded from its own dependency list)

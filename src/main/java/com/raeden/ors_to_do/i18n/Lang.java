@@ -82,6 +82,26 @@ public enum Lang {
     MENU_DELETE_PERK("Permanently Delete Perk"),
     MENU_RESET_PROGRESS("Reset Repeating Progress"),
     COUNTER_TARGET_REACHED("Target reached ({0}/{0})"),
+    CATEGORY_UNCATEGORIZED("Uncategorized"),
+    CATEGORY_LABEL("Category:"),
+    CATEGORY_PROMPT("Optional category name"),
+    CATEGORY_ENABLE_TOGGLE("Enable Categories"),
+    CATEGORY_ENABLE_DESC("Group cards under collapsible category headers. Set a card's category in its edit dialog."),
+    CATEGORY_HEADER_COUNT("{0} ({1})"),
+    CATEGORY_CUSTOMIZE_MENU("Customize Category..."),
+    CATEGORY_STYLE_DIALOG_TITLE("Customize Category: {0}"),
+    CATEGORY_STYLE_BACKGROUND("Background Color:"),
+    CATEGORY_STYLE_BORDER("Border Color:"),
+    CATEGORY_STYLE_TEXT("Text Color:"),
+    CATEGORY_STYLE_ICON("Icon & Color:"),
+    CATEGORY_STYLE_RESET("Reset to Default"),
+    CATEGORY_EDIT_TOOLTIP("Customize this category's appearance"),
+    CATEGORY_NAME_LABEL("Category Name:"),
+    CATEGORY_NAME_UNCATEGORIZED_TOOLTIP("This is the built-in fallback bucket — its name can't be changed."),
+    OPEN_DATA_FOLDER_BTN("📁 Open Data Folder"),
+    OPEN_DATA_FOLDER_TOOLTIP("Open the folder where tasks.json, stats.json and backups are stored."),
+    OPEN_DATA_FOLDER_ERROR_HEADER("Cannot Open Data Folder"),
+    OPEN_DATA_FOLDER_ERROR_BODY("Could not open the folder:\n{0}"),
 
     // ---------------------------------------------------------------------
     // Confirmation dialogs
@@ -165,7 +185,9 @@ public enum Lang {
     NOTIFY_DEBUFF_CLEANSED_TITLE("Debuff Cleansed!"),
     NOTIFY_DEBUFF_CLEANSED_BODY("You have overcome: {0}"),
     ERR_OPEN_PATH("Failed to open path: \n{0}"),
-    ERR_EXECUTION_HEADER("Execution Error");
+    ERR_EXECUTION_HEADER("Execution Error"),
+    ERR_BAD_TIME_HEADER("Invalid Time"),
+    ERR_BAD_TIME_BODY("Time '{0}' is not a valid HH:mm value (00:00-23:59). The deadline was saved as 00:00 — please re-open and fix.");
 
     private final String template;
 

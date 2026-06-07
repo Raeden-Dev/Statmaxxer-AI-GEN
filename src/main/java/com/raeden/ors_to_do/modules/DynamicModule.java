@@ -13,6 +13,7 @@ import com.raeden.ors_to_do.modules.dependencies.ui.cards.PerkCard;
 import com.raeden.ors_to_do.modules.dependencies.ui.cards.RepeatableTaskCard;
 import com.raeden.ors_to_do.modules.dependencies.ui.cards.StatCard;
 import com.raeden.ors_to_do.modules.dependencies.ui.cards.TaskCard;
+import com.raeden.ors_to_do.modules.dependencies.ui.components.CategoryGroupRenderer;
 import com.raeden.ors_to_do.modules.dependencies.ui.components.DynamicInputPanel;
 import com.raeden.ors_to_do.modules.dependencies.ui.components.FilterSortHeader;
 import com.raeden.ors_to_do.modules.dependencies.ui.layout.ZenModeOverlay;
@@ -90,18 +91,9 @@ public class DynamicModule extends StackPane {
         scrollPane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> { if (bgMenu.isShowing()) bgMenu.hide(); });
 
         if (!config.isStatPage()) {
-            Runnable onInputRefresh = () -> {
-                if (config.isChallengePage() && !globalDatabase.isEmpty()) {
-                    TaskItem newest = globalDatabase.get(globalDatabase.size() - 1);
-                    if (newest.getSectionId() != null && newest.getSectionId().equals(config.getId())) {
-                        newest.setChallengeCard(true);
-                        StorageManager.saveTasks(globalDatabase);
-                    }
-                }
-                refreshList();
-            };
-
-            DynamicInputPanel inputPanel = new DynamicInputPanel(config, appStats, globalDatabase, filterSortHeader, onInputRefresh);
+            // Challenge-page flagging happens inside DynamicInputPanel.addTask itself, so a plain
+            // refreshList() is all that's needed here.
+            DynamicInputPanel inputPanel = new DynamicInputPanel(config, appStats, globalDatabase, filterSortHeader, this::refreshList);
             mainContent.setBottom(inputPanel);
         }
 
@@ -176,13 +168,16 @@ public class DynamicModule extends StackPane {
             listContainer.getChildren().add(emptyLabel);
         } else {
             Runnable onUpdateTrigger = () -> { refreshList(); if (syncCallback != null) syncCallback.run(); };
+            java.util.function.Function<TaskItem, javafx.scene.Node> cardFor = t -> t.isRepeatingMode()
+                    ? new RepeatableTaskCard(t, config, appStats, globalDatabase, onUpdateTrigger, activeTimelines, this::reorderTasks)
+                    : new TaskCard(t, config, appStats, globalDatabase, onUpdateTrigger, activeTimelines, this::reorderTasks);
 
-            for (TaskItem task : tasksToDisplay) {
-                if (task.isRepeatingMode()) {
-                    listContainer.getChildren().add(new RepeatableTaskCard(task, config, appStats, globalDatabase, onUpdateTrigger, activeTimelines, this::reorderTasks));
-                } else {
-                    listContainer.getChildren().add(new TaskCard(task, config, appStats, globalDatabase, onUpdateTrigger, activeTimelines, this::reorderTasks));
-                }
+            if (config.isEnableCategories()) {
+                // Pass refreshList as the post-toggle / post-style callback so the page redraws
+                // (and new style colours take effect) immediately after a click in the header.
+                CategoryGroupRenderer.render(listContainer, tasksToDisplay, globalDatabase, config, appStats, cardFor, this::refreshList);
+            } else {
+                for (TaskItem task : tasksToDisplay) listContainer.getChildren().add(cardFor.apply(task));
             }
         }
 
@@ -257,8 +252,13 @@ public class DynamicModule extends StackPane {
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);
             listContainer.getChildren().add(emptyMsg);
         } else {
-            for (TaskItem perk : perks) {
-                listContainer.getChildren().add(new PerkCard(perk, appStats, globalDatabase, () -> { refreshList(); if (syncCallback != null) syncCallback.run(); }));
+            Runnable onUpdate = () -> { refreshList(); if (syncCallback != null) syncCallback.run(); };
+            java.util.function.Function<TaskItem, javafx.scene.Node> perkCardFor =
+                    perk -> new PerkCard(perk, appStats, globalDatabase, onUpdate);
+            if (config.isEnableCategories()) {
+                CategoryGroupRenderer.render(listContainer, perks, globalDatabase, config, appStats, perkCardFor, this::refreshList);
+            } else {
+                for (TaskItem perk : perks) listContainer.getChildren().add(perkCardFor.apply(perk));
             }
         }
         filterSortHeader.updateBadges(totalCount, activeCount);
@@ -285,8 +285,13 @@ public class DynamicModule extends StackPane {
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);
             listContainer.getChildren().add(emptyMsg);
         } else {
-            for (TaskItem challenge : challenges) {
-                listContainer.getChildren().add(new ChallengeCard(challenge, appStats, globalDatabase, () -> { refreshList(); if (syncCallback != null) syncCallback.run(); }));
+            Runnable onUpdate = () -> { refreshList(); if (syncCallback != null) syncCallback.run(); };
+            java.util.function.Function<TaskItem, javafx.scene.Node> chCardFor =
+                    challenge -> new ChallengeCard(challenge, appStats, globalDatabase, onUpdate);
+            if (config.isEnableCategories()) {
+                CategoryGroupRenderer.render(listContainer, challenges, globalDatabase, config, appStats, chCardFor, this::refreshList);
+            } else {
+                for (TaskItem challenge : challenges) listContainer.getChildren().add(chCardFor.apply(challenge));
             }
         }
         filterSortHeader.updateBadges(availableCount, completedCount);

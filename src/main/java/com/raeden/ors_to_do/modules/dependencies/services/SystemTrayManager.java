@@ -39,17 +39,12 @@ public class SystemTrayManager {
             trayIcon = new TrayIcon(awtImage, "Task Tracker");
             trayIcon.setImageAutoSize(true);
 
-            // Double-click to restore the app
+            // Double-click to restore the app — use the restorer for the same reason as below.
             trayIcon.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
                     if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
-                        Platform.runLater(() -> {
-                            if (mainStage != null) {
-                                mainStage.show();
-                                mainStage.toFront();
-                            }
-                        });
+                        WindowRestorer.surface(mainStage);
                     }
                 }
             });
@@ -58,12 +53,9 @@ public class SystemTrayManager {
             PopupMenu popup = new PopupMenu();
 
             MenuItem openItem = new MenuItem("Open Task Tracker");
-            openItem.addActionListener(e -> Platform.runLater(() -> {
-                if (mainStage != null) {
-                    mainStage.show();
-                    mainStage.toFront();
-                }
-            }));
+            // The bare show()/toFront() sequence is unreliable on Windows because of the
+            // foreground-window lock; WindowRestorer applies the alwaysOnTop-flip workaround.
+            openItem.addActionListener(e -> WindowRestorer.surface(mainStage));
 
             MenuItem exitItem = new MenuItem("Exit");
             exitItem.addActionListener(e -> {

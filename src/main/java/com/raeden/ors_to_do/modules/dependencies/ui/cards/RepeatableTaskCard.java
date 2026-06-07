@@ -47,7 +47,8 @@ public class RepeatableTaskCard extends VBox {
         // --- FIXED: Apply both Time Lock AND Section Completion Lock to double-click ---
         mainRow.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && event.getButton() == MouseButton.PRIMARY) {
-                int lockHours = appStats.getPreventEditingHours();
+                // Per-section prevent-editing window (formerly a global setting).
+                int lockHours = config != null ? config.getPreventEditingHours() : 0;
                 boolean isNoteMode = config != null && config.isNotesPage();
                 boolean isRewardMode = config != null && config.isRewardsPage();
 

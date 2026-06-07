@@ -98,6 +98,35 @@ public class TaskEditDialog {
         grid.add(repeatingTaskCheck, 0, rowIdx.get());
         grid.add(repBox, 1, rowIdx.getAndIncrement());
 
+        // --- NEW: Category field (only shown when the section opts in via "Enable Categories") ---
+        TextField categoryField = null;
+        if (config != null && config.isEnableCategories()) {
+            categoryField = new TextField(task.getCategoryName() != null ? task.getCategoryName() : "");
+            categoryField.setPromptText(com.raeden.ors_to_do.i18n.Lang.CATEGORY_PROMPT.get());
+
+            // Build a small suggestions row so users don't have to retype existing categories.
+            java.util.List<String> existing = new java.util.ArrayList<>();
+            for (TaskItem other : globalDatabase) {
+                if (other == task) continue;
+                if (other.getSectionId() == null || !other.getSectionId().equals(config.getId())) continue;
+                String c = other.getCategoryName();
+                if (c != null && !c.trim().isEmpty() && !existing.contains(c)) existing.add(c);
+            }
+            javafx.scene.layout.FlowPane suggestionPane = new javafx.scene.layout.FlowPane(5, 5);
+            for (String c : existing) {
+                Button chip = new Button(c);
+                chip.setStyle("-fx-background-color: #2D2D30; -fx-text-fill: #DCDCAA; -fx-border-color: #555555; -fx-border-radius: 8; -fx-background-radius: 8; -fx-cursor: hand; -fx-padding: 1 8;");
+                TextField finalCatField = categoryField;
+                chip.setOnAction(e -> finalCatField.setText(c));
+                suggestionPane.getChildren().add(chip);
+            }
+
+            javafx.scene.layout.VBox catBox = new javafx.scene.layout.VBox(4, categoryField, suggestionPane);
+            grid.add(new Label(com.raeden.ors_to_do.i18n.Lang.CATEGORY_LABEL.get()), 0, rowIdx.get());
+            grid.add(catBox, 1, rowIdx.getAndIncrement());
+        }
+        final TextField categoryFieldFinal = categoryField;
+
         // Ensure Mutually Exclusive Link vs Repeating Logic
         linkCardCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
@@ -173,6 +202,11 @@ public class TaskEditDialog {
 
                 if (repeatingTaskCheck.isSelected()) {
                     task.setRepetitionCount(repCounterSpinner.getValue());
+                }
+
+                if (categoryFieldFinal != null) {
+                    String typed = categoryFieldFinal.getText() != null ? categoryFieldFinal.getText().trim() : "";
+                    task.setCategoryName(typed.isEmpty() ? null : typed);
                 }
 
                 styleForm.applyTo(task);

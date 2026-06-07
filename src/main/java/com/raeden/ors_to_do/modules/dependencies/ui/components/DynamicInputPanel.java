@@ -60,7 +60,13 @@ public class DynamicInputPanel extends HBox {
         if (config.isShowPriority() && !config.isNotesPage() && !config.isPerkPage()) {
             priorityBox = new ComboBox<>();
             priorityBox.getItems().addAll(appStats.getCustomPriorities());
-            if (!appStats.getCustomPriorities().isEmpty()) priorityBox.setValue(appStats.getCustomPriorities().get(1));
+            // Default to the second priority ("medium" in the seeded set), but fall back to the
+            // first if the user has only one priority defined. Without this guard, deleting
+            // priorities down to a single entry crashes the section with IndexOutOfBoundsException.
+            int prioSize = appStats.getCustomPriorities().size();
+            if (prioSize > 0) {
+                priorityBox.setValue(appStats.getCustomPriorities().get(Math.min(1, prioSize - 1)));
+            }
             TaskDialogs.setupPriorityBoxColors(priorityBox);
             getChildren().add(priorityBox);
         }
@@ -95,6 +101,10 @@ public class DynamicInputPanel extends HBox {
             }
         }
         if (config.isShowTaskType() && !config.isNotesPage() && !config.isPerkPage()) newTask.setTaskType("General");
+
+        // Flag challenge-page tasks here so we never rely on "last item in the global database",
+        // which races with other sections that might be appending tasks concurrently.
+        if (config.isChallengePage()) newTask.setChallengeCard(true);
 
         globalDatabase.add(newTask);
 

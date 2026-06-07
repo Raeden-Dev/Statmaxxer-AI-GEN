@@ -62,9 +62,6 @@ public class GeneralSettingsPanel extends VBox {
         Spinner<Integer> fontSizeSpinner = new Spinner<>(10, 36, appStats.getTaskFontSize());
         fontSizeSpinner.setEditable(true);
 
-        Spinner<Integer> preventEditingSpinner = new Spinner<>(0, 8760, appStats.getPreventEditingHours());
-        preventEditingSpinner.setEditable(true);
-
         Slider streakSlider = new Slider(10, 100, appStats.getMinDailyCompletionPercent());
         streakSlider.setMajorTickUnit(10); streakSlider.setMinorTickCount(0); streakSlider.setSnapToTicks(true);
         streakSlider.setShowTickLabels(false); streakSlider.setShowTickMarks(false); streakSlider.setPrefWidth(120);
@@ -202,7 +199,6 @@ public class GeneralSettingsPanel extends VBox {
                 createSettingRow("Checkbox Theme", "Changes the visual style and color of the completion checkboxes.", themeBox, "#DCDCAA"),
                 createSettingRow("Zen Mode", "Number of active tasks required before Zen Mode becomes available.", zenSpinner, "#FF6666"),
                 createSettingRow("Urge Surfing Tool", "Configure the breathing session duration and custom quotes to help resist bad habits.", urgeSettingsBtn, "#4EC9B0"),
-                createSettingRow("Prevent Editing (Hours)", "Number of hours after creation before a task is permanently locked from being edited. (0 = Disabled)", preventEditingSpinner, "#FF8C00"),
                 createSettingRow("Require Completion Confirmation", "Prompts for confirmation before completing tasks in selected sections.", confirmMenu, "#FF6666"),
                 createSettingRow("Minimum Streak Threshold", "Percentage of completed tasks required to maintain a completion streak.", sliderBox, "#4EC9B0"),
                 createSettingRow("Strict Focus Auto-Pause", "Minutes of global keyboard/mouse inactivity before the Focus Hub timer automatically pauses. (0 = Disabled)", inactivitySpinner, "#FF6666"),
@@ -266,7 +262,6 @@ public class GeneralSettingsPanel extends VBox {
             appStats.setCheckboxTheme(themeBox.getValue());
             appStats.setFocusInactivityThreshold(inactivitySpinner.getValue());
             appStats.setExpandStatMiniCards(chkExpandedStats.isSelected());
-            appStats.setPreventEditingHours(preventEditingSpinner.getValue());
 
             WindowsStartupManager.setStartupEnabled(chkStartup.isSelected());
 
@@ -284,7 +279,6 @@ public class GeneralSettingsPanel extends VBox {
         };
 
         fontSizeSpinner.valueProperty().addListener((obs, oldVal, newVal) -> autoSaveTrigger.run());
-        preventEditingSpinner.valueProperty().addListener((obs, oldVal, newVal) -> autoSaveTrigger.run());
         zenSpinner.valueProperty().addListener((obs, oldVal, newVal) -> autoSaveTrigger.run());
         streakSlider.valueChangingProperty().addListener((obs, wasChanging, isChanging) -> { if (!isChanging) autoSaveTrigger.run(); });
         streakSlider.setOnMouseReleased(e -> autoSaveTrigger.run());

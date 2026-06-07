@@ -30,6 +30,37 @@ public final class ChallengeConfigDialog {
 
     private ChallengeConfigDialog() { }
 
+    /** Appends a category input row + clickable suggestions chips to {@code content}. */
+    private static TextField addCategoryField(VBox content,
+                                              TaskItem owner,
+                                              com.raeden.ors_to_do.dependencies.models.SectionConfig section,
+                                              List<TaskItem> globalDatabase) {
+        content.getChildren().add(new Separator());
+        Label catLabel = new Label(Lang.CATEGORY_LABEL.get());
+        catLabel.setStyle("-fx-text-fill: #DCDCAA; -fx-font-weight: bold;");
+        content.getChildren().add(catLabel);
+
+        TextField catField = new TextField(owner.getCategoryName() != null ? owner.getCategoryName() : "");
+        catField.setPromptText(Lang.CATEGORY_PROMPT.get());
+
+        java.util.List<String> existing = new java.util.ArrayList<>();
+        for (TaskItem other : globalDatabase) {
+            if (other == owner) continue;
+            if (other.getSectionId() == null || !other.getSectionId().equals(section.getId())) continue;
+            String c = other.getCategoryName();
+            if (c != null && !c.trim().isEmpty() && !existing.contains(c)) existing.add(c);
+        }
+        javafx.scene.layout.FlowPane chips = new javafx.scene.layout.FlowPane(5, 5);
+        for (String c : existing) {
+            javafx.scene.control.Button chip = new javafx.scene.control.Button(c);
+            chip.setStyle("-fx-background-color: #2D2D30; -fx-text-fill: #DCDCAA; -fx-border-color: #555555; -fx-border-radius: 8; -fx-background-radius: 8; -fx-cursor: hand; -fx-padding: 1 8;");
+            chip.setOnAction(e -> catField.setText(c));
+            chips.getChildren().add(chip);
+        }
+        content.getChildren().addAll(catField, chips);
+        return catField;
+    }
+
     public static void open(TaskItem challengeTask, AppStats appStats, List<TaskItem> globalDatabase, Runnable onUpdate) {
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle(Lang.DLG_CONFIGURE_CHALLENGE_TITLE.get());
@@ -163,6 +194,11 @@ public final class ChallengeConfigDialog {
         }
         content.getChildren().add(lootGrid);
 
+        // --- Category field (only when the owning section opts in via "Enable Categories") ---
+        com.raeden.ors_to_do.dependencies.models.SectionConfig owningSection = appStats.findSection(challengeTask.getSectionId());
+        final TextField categoryField = (owningSection != null && owningSection.isEnableCategories())
+                ? addCategoryField(content, challengeTask, owningSection, globalDatabase) : null;
+
         content.getChildren().add(new Separator());
         Label hookLabel = new Label(Lang.LBL_UNLOCK_REQUIREMENTS.get());
         hookLabel.setStyle("-fx-text-fill: #4EC9B0; -fx-font-weight: bold;");
@@ -248,14 +284,26 @@ public final class ChallengeConfigDialog {
                 challengeTask.setIconColor(ColorUtil.toHexOrTransparent(iconColorPicker.getValue()));
                 challengeTask.setColorHex(ColorUtil.toHexOrTransparent(bgColorPicker.getValue()));
                 challengeTask.setCustomOutlineColor(ColorUtil.toHexOrTransparent(outlinePicker.getValue()));
-                challengeTask.setDependsOnTaskIds(selectedDeps);
+                challengeTask.setDependsOnTaskIds(DependencyMenuBuilder.stripStale(selectedDeps, globalDatabase));
+
+                if (categoryField != null) {
+                    String typed = categoryField.getText() != null ? categoryField.getText().trim() : "";
+                    challengeTask.setCategoryName(typed.isEmpty() ? null : typed);
+                }
 
                 if (datePicker.getValue() != null) {
-                    try {
-                        LocalTime time = LocalTime.MIDNIGHT;
-                        if (!timePicker.getText().trim().isEmpty()) time = LocalTime.parse(timePicker.getText().trim(), DateTimeFormatter.ofPattern("HH:mm"));
-                        challengeTask.setDeadline(LocalDateTime.of(datePicker.getValue(), time));
-                    } catch (Exception ex) { challengeTask.setDeadline(LocalDateTime.of(datePicker.getValue(), LocalTime.MIDNIGHT)); }
+                    LocalTime time = LocalTime.MIDNIGHT;
+                    String timeText = timePicker.getText().trim();
+                    if (!timeText.isEmpty()) {
+                        try {
+                            time = LocalTime.parse(timeText, DateTimeFormatter.ofPattern("HH:mm"));
+                        } catch (Exception ex) {
+                            // Previously this swallowed bad time strings and silently saved 00:00.
+                            // Surface a warning so the user knows their typed time was rejected.
+                            Design.warn(Lang.ERR_BAD_TIME_HEADER, Lang.ERR_BAD_TIME_BODY, timeText);
+                        }
+                    }
+                    challengeTask.setDeadline(LocalDateTime.of(datePicker.getValue(), time));
                 } else {
                     challengeTask.setDeadline(null);
                 }

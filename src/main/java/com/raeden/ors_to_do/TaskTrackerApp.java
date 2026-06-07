@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class TaskTrackerApp extends Application {
-    public static final String APP_VERSION = "v1.437";
+    public static final String APP_VERSION = "v1.45";
 
     private List<TaskItem> taskDatabase;
     private AppStats appStats;
@@ -84,6 +84,20 @@ public class TaskTrackerApp extends Application {
                 task.setSectionId(task.getLegacyOriginModule().name());
                 needsSave = true;
             }
+        }
+
+        // --- One-time migration: "Prevent Editing (Hours)" moved from global to per-section. ---
+        // If the user had a global value set, copy it onto every section that still has 0 so
+        // existing behaviour is preserved, then zero out the global value to retire it.
+        int legacyGlobalLock = appStats.getPreventEditingHours();
+        if (legacyGlobalLock > 0) {
+            for (SectionConfig sc : appStats.getSections()) {
+                if (sc.getPreventEditingHours() == 0) {
+                    sc.setPreventEditingHours(legacyGlobalLock);
+                }
+            }
+            appStats.setPreventEditingHours(0);
+            needsSave = true;
         }
 
         if (needsSave) {

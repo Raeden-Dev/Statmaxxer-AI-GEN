@@ -63,7 +63,8 @@ public class TaskCard extends VBox {
         // --- FIXED: Apply both Time Lock AND Section Completion Lock to double-click ---
         mainRow.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && event.getButton() == MouseButton.PRIMARY) {
-                int lockHours = appStats.getPreventEditingHours();
+                // Per-section prevent-editing window (formerly a global setting).
+                int lockHours = config != null ? config.getPreventEditingHours() : 0;
 
                 boolean isTimeLocked = !(isNoteMode || isRewardMode) && lockHours > 0 && java.time.LocalDateTime.now().isAfter(task.getDateCreated().plusHours(lockHours));
                 boolean isCompletionLocked = config != null && config.isLockCompletedTasks() && task.isFinished();

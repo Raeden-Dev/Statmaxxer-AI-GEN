@@ -56,11 +56,22 @@ public class DailyRolloverManager {
                         }
                     }
 
+                    // --- Reset-interval archive sweep ---
+                    // Previously this loop archived (and silently finished) **every** unarchived
+                    // task in the section, which:
+                    //   - wiped progress on counter/repeating cards (which are meant to persist),
+                    //   - silently flipped incomplete tasks to "finished" so they polluted streak
+                    //     stats and challenge-completion detection.
+                    // Now: only **completed**, non-counter, non-repeating tasks are archived. Tasks
+                    // that weren't finished by the deadline simply stay on the page (the streak
+                    // calculation above already counted them as a miss).
                     for (TaskItem task : taskDatabase) {
-                        if (section.getId().equals(task.getSectionId()) && !task.isArchived()) {
-                            task.setArchived(true);
-                            if (task.getDateCompleted() == null) task.setFinished(true);
-                        }
+                        if (!section.getId().equals(task.getSectionId())) continue;
+                        if (task.isArchived()) continue;
+                        if (!task.isFinished()) continue;             // keep incomplete tasks visible
+                        if (task.isCounterMode()) continue;           // counters persist across resets
+                        if (task.isRepeatingMode()) continue;         // repeaters persist across resets
+                        task.setArchived(true);
                     }
 
                     CustomPriority fallbackPrio = appStats.getCustomPriorities().isEmpty() ? null : appStats.getCustomPriorities().get(0);
@@ -157,13 +168,19 @@ public class DailyRolloverManager {
                 LocalDate lastGain = appStats.getLastStatGainDates().getOrDefault(stat.getId(), today);
                 long daysSinceGain = ChronoUnit.DAYS.between(lastGain, today);
 
-                if (daysSinceGain >= stat.getAtrophyDays()) {
+                // Catch up on missed atrophy windows in one pass — previously this only ever ticked
+                // a stat down by 1 even after a 10-day absence.
+                boolean fired = false;
+                while (daysSinceGain >= stat.getAtrophyDays() && stat.getCurrentAmount() > 0) {
                     stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - 1));
                     stat.setLifetimeLost(stat.getLifetimeLost() + 1);
                     statsChanged = true;
-
-                    appStats.getLastStatGainDates().put(stat.getId(), lastGain.plusDays(1));
-
+                    fired = true;
+                    lastGain = lastGain.plusDays(stat.getAtrophyDays());
+                    daysSinceGain = ChronoUnit.DAYS.between(lastGain, today);
+                }
+                if (fired) {
+                    appStats.getLastStatGainDates().put(stat.getId(), lastGain);
                     SystemTrayManager.pushNotification(
                             "Stat Atrophy: " + stat.getName(),
                             "Your " + stat.getName() + " stat has decayed due to inactivity! Complete a task to recover it."
@@ -175,6 +192,11 @@ public class DailyRolloverManager {
         boolean isLevelUpDay = (today.getDayOfWeek() == DayOfWeek.MONDAY);
 
         for (TaskItem task : globalDatabase) {
+            // Skip challenges: they have stat requirements too (as unlock gates), but they are NOT
+            // perks. Auto-levelling them on Monday rollover would let a hooked perk think the
+            // challenge was "completed" before the user actually clicks Challenge Done.
+            if (task.isChallengeCard()) continue;
+
             if (task.getStatRequirements() != null && !task.getStatRequirements().isEmpty()) {
 
                 boolean meetsAllStats = true;

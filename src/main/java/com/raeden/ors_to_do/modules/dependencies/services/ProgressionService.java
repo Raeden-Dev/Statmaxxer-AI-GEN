@@ -39,6 +39,12 @@ public final class ProgressionService {
                     || (depTask.getMaxCount() > 0 && depTask.getCurrentCount() >= depTask.getMaxCount());
         }
 
+        // Challenge cards: a *failed* challenge (finished but with no perkUnlockedDate) must NOT
+        // satisfy hooked dependencies — only a successfully conquered challenge does.
+        if (depTask.isChallengeCard()) {
+            return depTask.isFinished() && depTask.getPerkUnlockedDate() != null;
+        }
+
         boolean hasNoGates = depTask.getStatRequirements().isEmpty()
                 && (depTask.getDependsOnTaskIds() == null || depTask.getDependsOnTaskIds().isEmpty());
 

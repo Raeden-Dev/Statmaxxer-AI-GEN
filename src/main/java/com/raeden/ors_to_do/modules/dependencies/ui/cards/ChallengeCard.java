@@ -75,10 +75,23 @@ public class ChallengeCard extends VBox {
         }
 
         // 3. Deadline Check
+        // When a deadline passes without completion we lock the challenge in as Failed (same as the
+        // explicit Fail button). Without this, an expired challenge stays in limbo: the UI shows
+        // "Expired!" but the model never persists the failure, so a subsequent rollover (or any
+        // ProgressionService re-check) could still treat it as in-flight.
         boolean isExpired = false;
         if (challengeTask.getDeadline() != null && !isCompleted) {
             isExpired = LocalDateTime.now().isAfter(challengeTask.getDeadline());
-            if (isExpired) meetsRequirements = false;
+            if (isExpired) {
+                meetsRequirements = false;
+                challengeTask.setFinished(true);
+                challengeTask.setPermaLock(true);
+                challengeTask.setPerkUnlockedDate(null);
+                challengeTask.setPerkLostDate(LocalDateTime.now());
+                StorageManager.saveTasks(globalDatabase);
+                isCompleted = true;
+                isFailed = true;
+            }
         }
 
         // 4. Setup Phase & Locking
@@ -123,13 +136,19 @@ public class ChallengeCard extends VBox {
         }
 
         // --- CHECK EDIT TIME LOCK FOR UI ---
-        int lockHours = appStats.getPreventEditingHours();
+        // Prevent-editing window is now stored per-section; legacy global value migrates on launch.
+        com.raeden.ors_to_do.dependencies.models.SectionConfig owningSection = appStats.findSection(challengeTask.getSectionId());
+        int lockHours = owningSection != null ? owningSection.getPreventEditingHours() : 0;
         boolean isTimeLocked = lockHours > 0 && LocalDateTime.now().isAfter(challengeTask.getDateCreated().plusHours(lockHours));
+
+        // Final aliases for lambda capture (lambdas can't read locals that we reassigned above).
+        final boolean completedFinal = isCompleted;
+        final boolean lockedFinal = isLocked;
 
         // --- DOUBLE CLICK EDIT BLOCK ---
         this.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
-                if (isCompleted) return;
+                if (completedFinal) return;
 
                 if (isTimeLocked) {
                     Design.warn(Lang.EDIT_LOCKED_HEADER, Lang.EDIT_LOCKED_CHALLENGE_BODY, lockHours);
@@ -326,7 +345,7 @@ public class ChallengeCard extends VBox {
         contextMenu.getItems().addAll(editItem, new SeparatorMenuItem(), deleteItem);
 
         this.setOnContextMenuRequested(e -> {
-            if (isTimeLocked || isCompleted) {
+            if (isTimeLocked || completedFinal) {
                 editItem.setDisable(true);
                 editItem.setText(Lang.MENU_EDIT_CHALLENGE_LOCKED.get());
             } else {

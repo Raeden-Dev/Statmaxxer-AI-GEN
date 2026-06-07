@@ -204,6 +204,15 @@ public class AppStats implements Serializable {
         return sections;
     }
 
+    /** Convenience lookup. Returns null when no section matches. */
+    public SectionConfig findSection(String sectionId) {
+        if (sectionId == null) return null;
+        for (SectionConfig sc : getSections()) {
+            if (sectionId.equals(sc.getId())) return sc;
+        }
+        return null;
+    }
+
     public List<SectionConfig> getSectionPresets() {
         if (sectionPresets == null) sectionPresets = new ArrayList<>();
         return sectionPresets;
@@ -251,6 +260,48 @@ public class AppStats implements Serializable {
     private int preventEditingHours = 0;
     public int getPreventEditingHours() { return preventEditingHours; }
     public void setPreventEditingHours(int preventEditingHours) { this.preventEditingHours = preventEditingHours; }
+
+    /**
+     * Persisted per-section collapse state for category groups. Keys are section ids; each value
+     * is the set of category names the user has chosen to hide. Stored on AppStats so the UI
+     * preserves the user's expand/collapse choices across restarts.
+     */
+    /**
+     * Per-separator collapse state in the sidebar. Keys are separator section ids; value is
+     * {@code true} when the user has collapsed the separator (every section button below it,
+     * up to the next separator, is hidden). Persisted so the sidebar reopens in the same shape.
+     */
+    private Map<String, Boolean> collapsedSeparators = new HashMap<>();
+    public Map<String, Boolean> getCollapsedSeparators() {
+        if (collapsedSeparators == null) collapsedSeparators = new HashMap<>();
+        return collapsedSeparators;
+    }
+    public boolean isSeparatorCollapsed(String separatorId) {
+        if (separatorId == null) return false;
+        Boolean v = getCollapsedSeparators().get(separatorId);
+        return v != null && v;
+    }
+    public void setSeparatorCollapsed(String separatorId, boolean collapsed) {
+        if (separatorId == null) return;
+        if (collapsed) getCollapsedSeparators().put(separatorId, true);
+        else getCollapsedSeparators().remove(separatorId);
+    }
+
+    private Map<String, java.util.Set<String>> collapsedCategories = new HashMap<>();
+    public Map<String, java.util.Set<String>> getCollapsedCategories() {
+        if (collapsedCategories == null) collapsedCategories = new HashMap<>();
+        return collapsedCategories;
+    }
+    public boolean isCategoryCollapsed(String sectionId, String categoryName) {
+        if (sectionId == null || categoryName == null) return false;
+        java.util.Set<String> set = getCollapsedCategories().get(sectionId);
+        return set != null && set.contains(categoryName);
+    }
+    public void setCategoryCollapsed(String sectionId, String categoryName, boolean collapsed) {
+        if (sectionId == null || categoryName == null) return;
+        java.util.Set<String> set = getCollapsedCategories().computeIfAbsent(sectionId, k -> new java.util.HashSet<>());
+        if (collapsed) set.add(categoryName); else set.remove(categoryName);
+    }
 
     private boolean enableUrgeButton = true;
     private int urgeSessionDurationSeconds = 120;

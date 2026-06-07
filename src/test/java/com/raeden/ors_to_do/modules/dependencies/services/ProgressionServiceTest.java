@@ -72,6 +72,37 @@ public class ProgressionServiceTest {
         assertFalse(ProgressionService.isDependencyUnlocked(null));
     }
 
+    @Test
+    public void failedChallenge_doesNotSatisfyHook() {
+        // A challenge marked Fail (finished but no perkUnlockedDate) used to satisfy hooked deps.
+        TaskItem failed = task("failed-challenge");
+        failed.setChallengeCard(true);
+        failed.setFinished(true);
+        failed.setPerkLostDate(LocalDateTime.now());
+        // perkUnlockedDate remains null
+
+        assertFalse(ProgressionService.isDependencyUnlocked(failed));
+    }
+
+    @Test
+    public void conqueredChallenge_satisfiesHook() {
+        TaskItem won = task("won-challenge");
+        won.setChallengeCard(true);
+        won.setFinished(true);
+        won.setPerkUnlockedDate(LocalDateTime.now());
+
+        assertTrue(ProgressionService.isDependencyUnlocked(won));
+    }
+
+    @Test
+    public void unfinishedChallenge_doesNotSatisfyHook() {
+        TaskItem inFlight = task("in-flight");
+        inFlight.setChallengeCard(true);
+        // not finished
+
+        assertFalse(ProgressionService.isDependencyUnlocked(inFlight));
+    }
+
     // ---- meetsRequirements ----------------------------------------------------
 
     @Test

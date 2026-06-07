@@ -21,6 +21,15 @@ public class StorageManager {
 
     private static final String APP_DIR = System.getenv("APPDATA") + File.separator + "TaskTracker";
 
+    /**
+     * Absolute path of the directory where the app keeps {@code tasks.json}, {@code stats.json},
+     * their rolling backups, and any user-imported bundles. Exposed so settings UI can open the
+     * folder in the OS file explorer.
+     */
+    public static File getDataDirectory() {
+        return new File(APP_DIR);
+    }
+
     private static final String DATA_FILE = APP_DIR + File.separator + "tasks.json";
     private static final String STATS_FILE = APP_DIR + File.separator + "stats.json";
 

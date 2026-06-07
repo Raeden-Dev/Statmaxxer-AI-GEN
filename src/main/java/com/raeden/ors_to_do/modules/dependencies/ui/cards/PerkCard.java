@@ -320,6 +320,37 @@ public class PerkCard extends VBox {
 
         content.getChildren().add(activeReqsBox);
 
+        // --- Category field (only when the owning section opts in via "Enable Categories") ---
+        com.raeden.ors_to_do.dependencies.models.SectionConfig owningSection = appStats.findSection(perkTask.getSectionId());
+        final TextField perkCategoryField;
+        if (owningSection != null && owningSection.isEnableCategories()) {
+            content.getChildren().add(new Separator());
+            Label catLabel = new Label(Lang.CATEGORY_LABEL.get());
+            catLabel.setStyle("-fx-text-fill: #DCDCAA; -fx-font-weight: bold;");
+            content.getChildren().add(catLabel);
+
+            perkCategoryField = new TextField(perkTask.getCategoryName() != null ? perkTask.getCategoryName() : "");
+            perkCategoryField.setPromptText(Lang.CATEGORY_PROMPT.get());
+
+            java.util.List<String> existing = new java.util.ArrayList<>();
+            for (TaskItem other : globalDatabase) {
+                if (other == perkTask) continue;
+                if (other.getSectionId() == null || !other.getSectionId().equals(owningSection.getId())) continue;
+                String c = other.getCategoryName();
+                if (c != null && !c.trim().isEmpty() && !existing.contains(c)) existing.add(c);
+            }
+            javafx.scene.layout.FlowPane chips = new javafx.scene.layout.FlowPane(5, 5);
+            for (String c : existing) {
+                Button chip = new Button(c);
+                chip.setStyle("-fx-background-color: #2D2D30; -fx-text-fill: #DCDCAA; -fx-border-color: #555555; -fx-border-radius: 8; -fx-background-radius: 8; -fx-cursor: hand; -fx-padding: 1 8;");
+                chip.setOnAction(e -> perkCategoryField.setText(c));
+                chips.getChildren().add(chip);
+            }
+            content.getChildren().addAll(perkCategoryField, chips);
+        } else {
+            perkCategoryField = null;
+        }
+
         // 4. Hook Tasks / Challenges
         content.getChildren().add(new Separator());
         Label depLabel = new Label(Lang.LBL_HOOK_TASKS.get());
@@ -350,7 +381,12 @@ public class PerkCard extends VBox {
                 perkTask.setColorHex(ColorUtil.toHexOrTransparent(bgColorPicker.getValue()));
                 perkTask.setCustomOutlineColor(ColorUtil.toHexOrTransparent(outlinePicker.getValue()));
 
-                perkTask.setDependsOnTaskIds(selectedDeps);
+                perkTask.setDependsOnTaskIds(DependencyMenuBuilder.stripStale(selectedDeps, globalDatabase));
+
+                if (perkCategoryField != null) {
+                    String typed = perkCategoryField.getText() != null ? perkCategoryField.getText().trim() : "";
+                    perkTask.setCategoryName(typed.isEmpty() ? null : typed);
+                }
 
                 StorageManager.saveTasks(globalDatabase);
                 onUpdate.run();

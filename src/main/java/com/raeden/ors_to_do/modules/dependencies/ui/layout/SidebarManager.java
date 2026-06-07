@@ -3,6 +3,7 @@ package com.raeden.ors_to_do.modules.dependencies.ui.layout;
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
+import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -76,28 +77,20 @@ public class SidebarManager extends BorderPane {
         VBox dynamicSectionsBox = new VBox();
         dynamicSectionsBox.setStyle("-fx-background-color: transparent;");
 
+        // Tracks the most-recent separator's collapse state so buttons under it can be skipped
+        // until the next separator (or the end of the list).
+        boolean currentSeparatorCollapsed = false;
+
         for (SectionConfig config : appStats.getSections()) {
 
             if (config.isSeparator()) {
-                VBox sepBox = new VBox(2);
-                sepBox.setAlignment(Pos.CENTER);
-                sepBox.setPadding(new Insets(15, 10, 5, 10));
-
-                if (config.getName() != null && !config.getName().isEmpty()) {
-                    Label sepName = new Label(config.getName().toUpperCase());
-                    sepName.setStyle("-fx-text-fill: #858585; -fx-font-size: 10px; -fx-font-weight: bold; -fx-letter-spacing: 1.5px;");
-                    sepName.setMaxWidth(Double.MAX_VALUE);
-                    sepName.setAlignment(Pos.CENTER);
-                    sepBox.getChildren().add(sepName);
-                }
-
-                Separator line = new Separator();
-                line.setOpacity(0.15);
-                sepBox.getChildren().add(line);
-
-                dynamicSectionsBox.getChildren().add(sepBox);
+                currentSeparatorCollapsed = appStats.isSeparatorCollapsed(config.getId());
+                dynamicSectionsBox.getChildren().add(buildSeparatorRow(config, currentSeparatorCollapsed));
                 continue;
             }
+
+            // Skip rendering this button: it lives under a collapsed separator.
+            if (currentSeparatorCollapsed) continue;
 
             int activeTaskCount = 0;
 
@@ -246,5 +239,55 @@ public class SidebarManager extends BorderPane {
 
     public String getActiveModule() {
         return currentActiveModule;
+    }
+
+    /**
+     * Builds a clickable separator row that can collapse / expand all section buttons below it
+     * (up to the next separator). The chevron is drawn at opacity 0 by default and only fades in
+     * while the mouse is over the row — mirrors the hover affordance the static-modules expander
+     * at the bottom of the sidebar already uses.
+     */
+    private VBox buildSeparatorRow(SectionConfig config, boolean collapsed) {
+        VBox sepBox = new VBox(2);
+        sepBox.setAlignment(Pos.CENTER);
+        sepBox.setPadding(new Insets(15, 10, 5, 10));
+        sepBox.setCursor(Cursor.HAND);
+
+        // Header row: name + small hover-only chevron.
+        HBox titleRow = new HBox(6);
+        titleRow.setAlignment(Pos.CENTER);
+
+        Label sepName = null;
+        if (config.getName() != null && !config.getName().isEmpty()) {
+            sepName = new Label(config.getName().toUpperCase());
+            sepName.setStyle("-fx-text-fill: #858585; -fx-font-size: 10px; -fx-font-weight: bold; -fx-letter-spacing: 1.5px;");
+            sepName.setAlignment(Pos.CENTER);
+            titleRow.getChildren().add(sepName);
+        }
+
+        // Use the same arrow glyphs as the static-modules expander (▼ = expanded, ▲ = collapsed).
+        Label chevron = new Label(collapsed ? "▲" : "▼");
+        chevron.setStyle("-fx-text-fill: #858585; -fx-font-size: 9px;");
+        chevron.setOpacity(0.0);
+        titleRow.getChildren().add(chevron);
+
+        sepBox.getChildren().add(titleRow);
+
+        Separator line = new Separator();
+        line.setOpacity(0.15);
+        sepBox.getChildren().add(line);
+
+        // Hover-only chevron: matches the bottom static-expander affordance the user already knows.
+        sepBox.setOnMouseEntered(e -> chevron.setOpacity(1.0));
+        sepBox.setOnMouseExited(e -> chevron.setOpacity(0.0));
+
+        sepBox.setOnMouseClicked(e -> {
+            boolean newlyCollapsed = !appStats.isSeparatorCollapsed(config.getId());
+            appStats.setSeparatorCollapsed(config.getId(), newlyCollapsed);
+            StorageManager.saveStats(appStats);
+            refreshSidebar();
+        });
+
+        return sepBox;
     }
 }

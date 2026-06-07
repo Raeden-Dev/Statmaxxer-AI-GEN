@@ -69,6 +69,16 @@ public class TaskItem implements Serializable {
     private boolean notified4h = false;
     private boolean notified2h = false;
 
+    /**
+     * Free-text category bucket. When the owning section has {@code enableCategories} on, the
+     * renderer groups cards by this string and shows a collapsible header per group. Null/blank
+     * counts as "Uncategorized".
+     */
+    private String categoryName;
+
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
+
     private List<SubTask> subTasks = new ArrayList<>();
     private List<String> links = new ArrayList<>();
     private List<TaskLink> taskLinks = new ArrayList<>();
@@ -137,6 +147,13 @@ public class TaskItem implements Serializable {
 
     public LocalDateTime getDeadline() { return deadline; }
     public void setDeadline(LocalDateTime deadline) {
+        // Only re-arm the notification flags if the deadline actually moved. Without this guard,
+        // any edit-and-save that round-trips through the deadline field would re-fire every
+        // notification threshold the next time the notification scan runs.
+        if (java.util.Objects.equals(this.deadline, deadline)) {
+            this.deadline = deadline;
+            return;
+        }
         this.deadline = deadline;
         this.notified24h = false;
         this.notified12h = false;

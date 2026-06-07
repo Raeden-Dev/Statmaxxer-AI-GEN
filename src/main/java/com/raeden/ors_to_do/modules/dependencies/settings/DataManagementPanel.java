@@ -3,7 +3,10 @@ package com.raeden.ors_to_do.modules.dependencies.settings;
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
+import com.raeden.ors_to_do.dependencies.storage.StorageManager;
+import com.raeden.ors_to_do.i18n.Lang;
 import com.raeden.ors_to_do.modules.dependencies.services.BackupManager;
+import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.Design;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -44,12 +47,43 @@ public class DataManagementPanel extends VBox {
         HBox.setHgrow(importBtn, Priority.ALWAYS);
         importBtn.setStyle("-fx-background-color: #1a4d33; -fx-text-fill: #4EC9B0; -fx-border-color: #4EC9B0; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-padding: 8 15;");
 
+        Button openFolderBtn = new Button(Lang.OPEN_DATA_FOLDER_BTN.get());
+        openFolderBtn.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(openFolderBtn, Priority.ALWAYS);
+        openFolderBtn.setStyle("-fx-background-color: #1a4d33; -fx-text-fill: #C586C0; -fx-border-color: #C586C0; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-padding: 8 15;");
+        openFolderBtn.setTooltip(new Tooltip(Lang.OPEN_DATA_FOLDER_TOOLTIP.get()));
+
         exportBtn.setOnAction(e -> BackupManager.exportData(appStats, globalDatabase));
         importBtn.setOnAction(e -> BackupManager.importData(appStats, globalDatabase, refreshCallback));
         customExportBtn.setOnAction(e -> showCustomExportDialog(appStats, globalDatabase));
+        openFolderBtn.setOnAction(e -> openDataFolder());
 
-        buttonBox.getChildren().addAll(exportBtn, customExportBtn, importBtn);
+        buttonBox.getChildren().addAll(exportBtn, customExportBtn, importBtn, openFolderBtn);
         getChildren().addAll(header, buttonBox);
+    }
+
+    /**
+     * Opens the directory where tasks.json / stats.json / backups live in the OS file explorer.
+     * Done off the JavaFX thread because {@link java.awt.Desktop#open} can block briefly on
+     * Windows while it spawns the shell handler.
+     */
+    private void openDataFolder() {
+        java.io.File dir = StorageManager.getDataDirectory();
+        if (!dir.exists()) dir.mkdirs();   // first launch may not have written anything yet
+        new Thread(() -> {
+            try {
+                if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
+                    java.awt.Desktop.getDesktop().open(dir);
+                } else {
+                    javafx.application.Platform.runLater(() ->
+                            Design.error(Lang.OPEN_DATA_FOLDER_ERROR_HEADER, Lang.OPEN_DATA_FOLDER_ERROR_BODY, dir.getAbsolutePath()));
+                }
+            } catch (Exception ex) {
+                javafx.application.Platform.runLater(() ->
+                        Design.error(Lang.OPEN_DATA_FOLDER_ERROR_HEADER, Lang.OPEN_DATA_FOLDER_ERROR_BODY,
+                                dir.getAbsolutePath() + "\n\n" + ex.getMessage()));
+            }
+        }, "open-data-folder").start();
     }
 
     private void showCustomExportDialog(AppStats appStats, List<TaskItem> globalDatabase) {

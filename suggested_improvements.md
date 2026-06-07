@@ -49,6 +49,27 @@ the remainder is the open backlog.
 - `ProgressionService.isDependencyUnlocked` requires counter cards to reach their target before
   they count as satisfied — fixes the reported bug.
 
+### 8. Card categorization system
+- New `SectionConfig.enableCategories` toggle (in Section Edit dialog).
+- New `TaskItem.categoryName` field; per-card category input in Task/Perk/Challenge edit dialogs
+  with chips for existing categories in the same section.
+- `CategoryGroupRenderer` renders tasks under collapsible category headers; collapse state is
+  persisted per-section via `AppStats.collapsedCategories`.
+
+### 9. "Prevent Editing (Hours)" moved to per-section
+- Removed from `GeneralSettingsPanel`; added to `SectionEditDialog`.
+- Migration on first launch copies the legacy global value onto every section that had 0, then
+  zeroes the global field so the new per-section knob is the source of truth.
+- All four card readers (`ChallengeCard`, `PerkCard`-context, `TaskCard`, `RepeatableTaskCard`,
+  `TaskContextMenu`) now consult `config.getPreventEditingHours()`.
+
+### 10. Tray second-launch surfaces the existing window
+- New `WindowRestorer.surface(Stage)` applies the Windows-foreground-lock workaround
+  (alwaysOnTop flip + iconify nudge) so a second-launch via taskbar/icon while the app is in tray
+  now reliably brings the existing window to the front instead of being swallowed.
+- Used by `SingleInstanceManager` (FOCUS message) and `SystemTrayManager` (double-click + "Open"
+  menu item).
+
 ---
 
 ## 🟡 Backlog
@@ -70,15 +91,19 @@ order-sensitive (re-rendering the same perk twice in one tick can re-stamp dates
 **Action.** Centralize "recompute & save" in the daily-rollover/app-tick path; let the card only
 **read** the model.
 
-### 10. Bug fixes from `potential_bugs.md`
-Highest priority cluster:
-- #1 priority `.get(1)` crash when only one priority exists
-- #2 challenges getting auto-levelled as perks on Monday rollover
-- #3 failed challenges still satisfying hooked dependencies
-- #4 daily rollover finishing & archiving counter / repeating tasks
-- #6 wrong task flagged as challenge on a Challenge page
+### 10. Bug fixes from `potential_bugs.md` — ✅ DONE for the high-priority cluster
+- #1 priority `.get(1)` crash — fixed (clamped index)
+- #2 challenges auto-levelled as perks on Monday — fixed (rollover skips `isChallengeCard`)
+- #3 failed challenges satisfying hooked deps — fixed (`ProgressionService` requires `perkUnlockedDate`)
+- #4 daily rollover finishing & archiving counter / repeating tasks — fixed (rollover sweep only archives *finished* non-counter tasks)
+- #6 wrong task flagged as challenge — fixed (input panel flags directly)
+- #7 expired challenge state not persisted — fixed (auto-fail on expiry)
+- #8 deadline edits re-arm notifications — fixed (Objects.equals guard)
+- #9 stat atrophy single-day catch-up — fixed (now loops)
+- #10 garbage time string silently saved — fixed (Design.warn surfaces it)
+- #12 stale dep ids — fixed (`DependencyMenuBuilder.stripStale`)
 
-These compound on each other — fix together rather than in isolation.
+Remaining: #5 (perk state mutation in view) and #11 (blank-priority chip cosmetic).
 
 ### 11. Keep splitting classes that are trending toward "god class" status
 `ChallengeCard` was the only file >500 lines. Watch the next-largest:
