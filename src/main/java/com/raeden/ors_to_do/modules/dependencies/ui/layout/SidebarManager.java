@@ -79,13 +79,17 @@ public class SidebarManager extends BorderPane {
 
         // Tracks the most-recent separator's collapse state so buttons under it can be skipped
         // until the next separator (or the end of the list).
+        boolean retractableEnabled = appStats.isSidebarSeparatorsCollapsible();
         boolean currentSeparatorCollapsed = false;
 
         for (SectionConfig config : appStats.getSections()) {
 
             if (config.isSeparator()) {
-                currentSeparatorCollapsed = appStats.isSeparatorCollapsed(config.getId());
-                dynamicSectionsBox.getChildren().add(buildSeparatorRow(config, currentSeparatorCollapsed));
+                // When retractability is off, every separator is forced into the collapsed state
+                // (the toggle's on→off action already persists this; we re-honour it here so a
+                // freshly toggled session looks right without an extra refresh).
+                currentSeparatorCollapsed = !retractableEnabled || appStats.isSeparatorCollapsed(config.getId());
+                dynamicSectionsBox.getChildren().add(buildSeparatorRow(config, currentSeparatorCollapsed, retractableEnabled));
                 continue;
             }
 
@@ -242,51 +246,65 @@ public class SidebarManager extends BorderPane {
     }
 
     /**
-     * Builds a clickable separator row that can collapse / expand all section buttons below it
-     * (up to the next separator). The chevron is drawn at opacity 0 by default and only fades in
-     * while the mouse is over the row — mirrors the hover affordance the static-modules expander
-     * at the bottom of the sidebar already uses.
+     * Builds a separator row. When {@code retractable} is true the row is clickable, the chevron
+     * fades in on hover, and a collapsed separator gets a distinct visual treatment so the user
+     * can see at a glance which sections are hidden. When {@code retractable} is false the row is
+     * static (no hover/click) and just shows the dim divider — the user disabled the feature.
      */
-    private VBox buildSeparatorRow(SectionConfig config, boolean collapsed) {
-        VBox sepBox = new VBox(2);
+    private VBox buildSeparatorRow(SectionConfig config, boolean collapsed, boolean retractable) {
+        // Tightened padding: was Insets(15, 10, 5, 10) — section buttons now sit closer to the
+        // separator above them.
+        VBox sepBox = new VBox(1);
         sepBox.setAlignment(Pos.CENTER);
-        sepBox.setPadding(new Insets(15, 10, 5, 10));
-        sepBox.setCursor(Cursor.HAND);
+        sepBox.setPadding(new Insets(6, 10, 1, 10));
 
-        // Header row: name + small hover-only chevron.
+        if (retractable) sepBox.setCursor(Cursor.HAND);
+
+        // Header row: name + chevron. Chevron always visible when collapsed (so the user
+        // recognises the retracted state from any angle); hover-only when expanded.
         HBox titleRow = new HBox(6);
         titleRow.setAlignment(Pos.CENTER);
+
+        // Distinct treatment for collapsed separators: brighter title text + accent colour so
+        // they're visually different from expanded separators of the same name.
+        String titleColor = collapsed ? "#DCDCAA" : "#858585";
 
         Label sepName = null;
         if (config.getName() != null && !config.getName().isEmpty()) {
             sepName = new Label(config.getName().toUpperCase());
-            sepName.setStyle("-fx-text-fill: #858585; -fx-font-size: 10px; -fx-font-weight: bold; -fx-letter-spacing: 1.5px;");
+            sepName.setStyle("-fx-text-fill: " + titleColor + "; -fx-font-size: 10px; -fx-font-weight: bold; -fx-letter-spacing: 1.5px;");
             sepName.setAlignment(Pos.CENTER);
             titleRow.getChildren().add(sepName);
         }
 
-        // Use the same arrow glyphs as the static-modules expander (▼ = expanded, ▲ = collapsed).
         Label chevron = new Label(collapsed ? "▲" : "▼");
-        chevron.setStyle("-fx-text-fill: #858585; -fx-font-size: 9px;");
-        chevron.setOpacity(0.0);
+        chevron.setStyle("-fx-text-fill: " + titleColor + "; -fx-font-size: 9px;");
+        // Collapsed → always visible (no hover required). Expanded + retractable → hover only.
+        // Disabled → never visible (the row is static).
+        chevron.setOpacity(collapsed && retractable ? 1.0 : 0.0);
         titleRow.getChildren().add(chevron);
 
         sepBox.getChildren().add(titleRow);
 
         Separator line = new Separator();
-        line.setOpacity(0.15);
+        // Subtle highlight on the divider when collapsed so the whole row reads as "retracted".
+        line.setOpacity(collapsed ? 0.45 : 0.15);
         sepBox.getChildren().add(line);
 
-        // Hover-only chevron: matches the bottom static-expander affordance the user already knows.
-        sepBox.setOnMouseEntered(e -> chevron.setOpacity(1.0));
-        sepBox.setOnMouseExited(e -> chevron.setOpacity(0.0));
+        if (retractable) {
+            // Hover-only chevron when expanded; collapsed already shows it. The mouseExited rule
+            // also has to honour the "always-on while collapsed" state, otherwise the chevron
+            // would fade out on every mouseExit even from a collapsed separator.
+            sepBox.setOnMouseEntered(e -> chevron.setOpacity(1.0));
+            sepBox.setOnMouseExited(e -> chevron.setOpacity(collapsed ? 1.0 : 0.0));
 
-        sepBox.setOnMouseClicked(e -> {
-            boolean newlyCollapsed = !appStats.isSeparatorCollapsed(config.getId());
-            appStats.setSeparatorCollapsed(config.getId(), newlyCollapsed);
-            StorageManager.saveStats(appStats);
-            refreshSidebar();
-        });
+            sepBox.setOnMouseClicked(e -> {
+                boolean newlyCollapsed = !appStats.isSeparatorCollapsed(config.getId());
+                appStats.setSeparatorCollapsed(config.getId(), newlyCollapsed);
+                StorageManager.saveStats(appStats);
+                refreshSidebar();
+            });
+        }
 
         return sepBox;
     }

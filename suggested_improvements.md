@@ -126,6 +126,24 @@ Already JSON via Gson — only the migration path from `.dat` legacy files still
 serialization. Models still implement `Serializable` only for that fallback; safe to delete the
 `Serializable` markers and `loadLegacyDat(...)` after a deprecation window.
 
+### 14. Storage redesign — ✅ DONE (per `src/main/resources/storage_redesign.md`)
+- New SQLite backend under `dependencies/storage/sqlite/`: `Db`, `SchemaManager`, `TaskRepository`,
+  `AppMetaRepository`, `JsonImporter`, `SnapshotManager`, `GsonProvider`.
+- `StorageManager` rewritten as a facade. Public API preserved (`saveTasks` / `loadTasks` /
+  `saveStats` / `loadStats`) so no call site needed to change.
+- **Phase 2 (surgical writes):** new `upsertTask(TaskItem)` / `deleteTask(String)` exposed; UI hot
+  paths (checkbox toggle, edit, archive) can migrate when convenient.
+- **Phase 3 (lazy slices):** `loadActiveTasks()`, `loadArchivedTasks()`, `loadTasksBySection(...)`
+  exposed so the Archive page can stop being loaded at startup.
+- **Phase 4 (snapshots):** `SnapshotManager` writes `backups/tasktracker_YYYYMMDD.db` once per day
+  via SQLite `VACUUM INTO`, keeping the last 7. Replaces the old `.bak1/2/3` rotation for the live
+  store; `BackupManager`'s human-readable JSON export is unchanged.
+- **Migration:** `JsonImporter` reads any existing `tasks.json` / `stats.json` / legacy `.dat` via
+  the same Gson type adapters and bulk-upserts on first launch, then renames originals to
+  `*.imported` (idempotent + reversible).
+- 12 new integration tests cover Phase 1 roundtrip, surgical writes, lazy slices, snapshot
+  retention, and the migration importer. **48/48 tests pass overall.**
+
 ---
 
 ## Reference

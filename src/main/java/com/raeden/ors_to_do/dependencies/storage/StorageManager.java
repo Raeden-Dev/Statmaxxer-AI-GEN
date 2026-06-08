@@ -1,166 +1,227 @@
 package com.raeden.ors_to_do.dependencies.storage;
 
-import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
+import com.raeden.ors_to_do.dependencies.storage.sqlite.AppMetaRepository;
+import com.raeden.ors_to_do.dependencies.storage.sqlite.Db;
+import com.raeden.ors_to_do.dependencies.storage.sqlite.JsonImporter;
+import com.raeden.ors_to_do.dependencies.storage.sqlite.SchemaManager;
+import com.raeden.ors_to_do.dependencies.storage.sqlite.SnapshotManager;
+import com.raeden.ors_to_do.dependencies.storage.sqlite.TaskRepository;
 
-import java.io.*;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
+import java.io.File;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Persistence facade backed by SQLite ({@code storage_redesign.md}).
+ *
+ * <p>The public API keeps the names {@code saveTasks / loadTasks / saveStats / loadStats} that
+ * call sites all over the app already use — so the storage swap is invisible to the rest of the
+ * code. Underneath, those methods now drive the SQLite repositories. Three additional method
+ * sets are exposed for callers that want to take advantage of the new backend:</p>
+ * <ul>
+ *   <li><b>Phase 2 surgical writes:</b> {@link #upsertTask(TaskItem)}, {@link #deleteTask(String)}.</li>
+ *   <li><b>Phase 3 lazy slices:</b> {@link #loadActiveTasks()}, {@link #loadArchivedTasks()},
+ *   {@link #loadTasksBySection(String)}.</li>
+ *   <li><b>Folder access:</b> {@link #getDataDirectory()} (already used by the
+ *   "Open Data Folder" button).</li>
+ * </ul>
+ *
+ * <p>The DB is opened lazily on the first call to any method that touches it. On first access the
+ * schema is created and the legacy {@code tasks.json}/{@code stats.json} files (if present) are
+ * imported into the new database, then renamed to {@code *.imported}.</p>
+ */
 public class StorageManager {
 
     private static final String APP_DIR = System.getenv("APPDATA") + File.separator + "TaskTracker";
+    private static final String DB_FILE_NAME = "tasktracker.db";
 
-    /**
-     * Absolute path of the directory where the app keeps {@code tasks.json}, {@code stats.json},
-     * their rolling backups, and any user-imported bundles. Exposed so settings UI can open the
-     * folder in the OS file explorer.
-     */
-    public static File getDataDirectory() {
-        return new File(APP_DIR);
-    }
+    /** The live DB connection. Initialised by {@link #ensureOpen()} on first use. */
+    private static volatile Db db;
 
-    private static final String DATA_FILE = APP_DIR + File.separator + "tasks.json";
-    private static final String STATS_FILE = APP_DIR + File.separator + "stats.json";
+    /** Optional data-directory override — primarily for tests. {@code null} = use APP_DIR. */
+    private static volatile File dataDirOverride;
 
-    private static final String LEGACY_DATA_FILE = APP_DIR + File.separator + "tasks.dat";
-    private static final String LEGACY_STATS_FILE = APP_DIR + File.separator + "stats.dat";
+    private StorageManager() { }
 
-    private static final Gson gson = new GsonBuilder()
-            .setPrettyPrinting()
-            .registerTypeAdapter(LocalDateTime.class, (JsonSerializer<LocalDateTime>) (src, typeOfSrc, context) -> new JsonPrimitive(src.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
-            .registerTypeAdapter(LocalDateTime.class, (JsonDeserializer<LocalDateTime>) (json, typeOfT, context) -> LocalDateTime.parse(json.getAsString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-            .registerTypeAdapter(LocalDate.class, (JsonSerializer<LocalDate>) (src, typeOfSrc, context) -> new JsonPrimitive(src.format(DateTimeFormatter.ISO_LOCAL_DATE)))
-            .registerTypeAdapter(LocalDate.class, (JsonDeserializer<LocalDate>) (json, typeOfT, context) -> LocalDate.parse(json.getAsString(), DateTimeFormatter.ISO_LOCAL_DATE))
-            .registerTypeAdapter(LocalTime.class, (JsonSerializer<LocalTime>) (src, typeOfSrc, context) -> new JsonPrimitive(src.format(DateTimeFormatter.ISO_LOCAL_TIME)))
-            .registerTypeAdapter(LocalTime.class, (JsonDeserializer<LocalTime>) (json, typeOfT, context) -> LocalTime.parse(json.getAsString(), DateTimeFormatter.ISO_LOCAL_TIME))
-            .create();
-
-    private static void safeSaveJson(Object data, String baseFilename) {
-        File directory = new File(APP_DIR);
-        if (!directory.exists()) directory.mkdirs();
-
-        File tempFile = new File(baseFilename + ".tmp");
-
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(tempFile), StandardCharsets.UTF_8)) {
-            gson.toJson(data, writer);
-        } catch (IOException e) {
-            System.err.println("Failed to write temp JSON file for " + baseFilename + ": " + e.getMessage());
-            return;
-        }
-
-        try {
-            for (int i = 2; i >= 1; i--) {
-                File src = new File(baseFilename + ".bak" + i);
-                File dest = new File(baseFilename + ".bak" + (i + 1));
-                if (src.exists()) Files.move(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            File original = new File(baseFilename);
-            File bak1 = new File(baseFilename + ".bak1");
-            if (original.exists()) Files.move(original.toPath(), bak1.toPath(), StandardCopyOption.REPLACE_EXISTING);
-
-            Files.move(tempFile.toPath(), original.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("Saved securely to JSON: " + baseFilename);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static <T> T safeLoadJson(String baseFilename, Type type) {
-        String[] filesToTry = { baseFilename, baseFilename + ".bak1", baseFilename + ".bak2", baseFilename + ".bak3" };
-
-        for (String path : filesToTry) {
-            File f = new File(path);
-            if (f.exists()) {
-                try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
-                    T obj = gson.fromJson(reader, type);
-                    if (!path.equals(baseFilename)) {
-                        System.out.println("⚠️ RECOVERED JSON FROM BACKUP: " + path);
-                    }
-                    return obj;
-                } catch (Exception e) {
-                    System.err.println("Corrupted JSON file detected: " + path + " - Attempting older backup...");
-                }
-            }
-        }
-        return null;
-    }
-
-    private static Object loadLegacyDat(String filename) {
-        File f = new File(filename);
-        if (f.exists()) {
-            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-                return ois.readObject();
-            } catch (Exception e) {
-                System.err.println("Failed to load legacy .dat file: " + filename);
-            }
-        }
-        return null;
-    }
+    // ---------------------------------------------------------------------
+    // Public API surface — Phase 1 drop-in replacements
+    // ---------------------------------------------------------------------
 
     public static void saveTasks(List<TaskItem> tasks) {
-        safeSaveJson(tasks, DATA_FILE);
+        try {
+            ensureOpen();
+            TaskRepository.saveAll(db, tasks == null ? new ArrayList<>() : tasks);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] saveTasks failed: " + e.getMessage());
+        }
     }
 
-    @SuppressWarnings("unchecked")
     public static List<TaskItem> loadTasks() {
-        Type type = new TypeToken<List<TaskItem>>(){}.getType();
-        List<TaskItem> loaded = safeLoadJson(DATA_FILE, type);
-
-        if (loaded == null) {
-            Object legacy = loadLegacyDat(LEGACY_DATA_FILE);
-            if (legacy != null) {
-                System.out.println("🔄 Migrating Tasks from Legacy .dat to .json format...");
-                loaded = (List<TaskItem>) legacy;
-            } else {
-                loaded = new ArrayList<>();
-            }
+        try {
+            ensureOpen();
+            return TaskRepository.loadAll(db);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] loadTasks failed: " + e.getMessage());
+            return new ArrayList<>();
         }
-
-        // --- FIXED: Compatibility Integrity Check ---
-        for (TaskItem task : loaded) {
-            if (task.getStatRewards() == null) task.setStatRewards(new java.util.HashMap<>());
-            if (task.getStatCapRewards() == null) task.setStatCapRewards(new java.util.HashMap<>());
-            if (task.getStatCosts() == null) task.setStatCosts(new java.util.HashMap<>());
-            if (task.getStatPenalties() == null) task.setStatPenalties(new java.util.HashMap<>());
-            if (task.getStatRequirements() == null) task.setStatRequirements(new java.util.HashMap<>());
-        }
-
-        return loaded;
     }
 
     public static void saveStats(AppStats stats) {
-        safeSaveJson(stats, STATS_FILE);
+        if (stats == null) return;
+        try {
+            ensureOpen();
+            AppMetaRepository.save(db, stats);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] saveStats failed: " + e.getMessage());
+        }
     }
 
     public static AppStats loadStats() {
-        AppStats loaded = safeLoadJson(STATS_FILE, AppStats.class);
-
-        if (loaded == null) {
-            Object legacy = loadLegacyDat(LEGACY_STATS_FILE);
-            if (legacy != null) {
-                System.out.println("🔄 Migrating AppStats from Legacy .dat to .json format...");
-                loaded = (AppStats) legacy;
-            } else {
-                loaded = new AppStats();
-            }
+        try {
+            ensureOpen();
+            AppStats s = AppMetaRepository.load(db);
+            return s != null ? s : new AppStats();
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] loadStats failed: " + e.getMessage());
+            return new AppStats();
         }
+    }
 
-        // --- FIXED: Initialize potentially missing fields from older versions ---
-        if (loaded.getFocusStatRewards() == null) loaded.setFocusStatRewards(new java.util.HashMap<>());
-        if (loaded.getUrgeQuotes() == null) loaded.setUrgeQuotes(new ArrayList<>());
+    // ---------------------------------------------------------------------
+    // Phase 2 — surgical writes (per-row, no full-rewrite cost)
+    // ---------------------------------------------------------------------
 
-        return loaded;
+    /** Upserts a single task — the per-row write the doc wants checkbox/edit/add to migrate to. */
+    public static void upsertTask(TaskItem task) {
+        try {
+            ensureOpen();
+            TaskRepository.upsert(db, task);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] upsertTask failed: " + e.getMessage());
+        }
+    }
+
+    /** Deletes a single task by id. */
+    public static void deleteTask(String taskId) {
+        try {
+            ensureOpen();
+            TaskRepository.delete(db, taskId);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] deleteTask failed: " + e.getMessage());
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 3 — lazy slices (avoid loading the archive at startup)
+    // ---------------------------------------------------------------------
+
+    /** Active tasks only — what the main UI should be loading on launch. */
+    public static List<TaskItem> loadActiveTasks() {
+        try {
+            ensureOpen();
+            return TaskRepository.loadActive(db);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] loadActiveTasks failed: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /** Archived tasks only. Lazily fetched when the Archive page opens. */
+    public static List<TaskItem> loadArchivedTasks() {
+        try {
+            ensureOpen();
+            return TaskRepository.loadArchived(db);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] loadArchivedTasks failed: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /** All tasks (active + archived) belonging to a single section. */
+    public static List<TaskItem> loadTasksBySection(String sectionId) {
+        try {
+            ensureOpen();
+            return TaskRepository.loadBySection(db, sectionId);
+        } catch (SQLException e) {
+            System.err.println("[StorageManager] loadTasksBySection failed: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Misc / utility
+    // ---------------------------------------------------------------------
+
+    /**
+     * Absolute path of the directory where the app keeps {@code tasktracker.db}, daily backups,
+     * and any user-imported bundles. Exposed so settings UI can open the folder in the OS file
+     * explorer.
+     */
+    public static File getDataDirectory() {
+        File override = dataDirOverride;
+        return override != null ? override : new File(APP_DIR);
+    }
+
+    /**
+     * Overrides the data directory used for the live DB and snapshots. Intended for tests so they
+     * can use a tmp dir; production code never calls this.
+     */
+    public static synchronized void setDataDirectoryForTesting(File dir) {
+        close();
+        dataDirOverride = dir;
+    }
+
+    /** Closes the live DB connection. Safe to call when nothing's been opened yet. */
+    public static synchronized void close() {
+        if (db != null) {
+            db.close();
+            db = null;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Internals
+    // ---------------------------------------------------------------------
+
+    /**
+     * Lazily opens the DB, applies the schema, and runs the JSON migration importer + the daily
+     * snapshot on first access. Subsequent calls are no-ops.
+     */
+    private static void ensureOpen() throws SQLException {
+        if (db != null) return;
+        synchronized (StorageManager.class) {
+            if (db != null) return;
+
+            File dir = getDataDirectory();
+            if (!dir.exists() && !dir.mkdirs()) {
+                throw new SQLException("Could not create data directory: " + dir);
+            }
+
+            File dbFile = new File(dir, DB_FILE_NAME);
+            String url = "jdbc:sqlite:" + dbFile.getAbsolutePath().replace('\\', '/');
+            Db opening = new Db(url);
+            opening.open();
+
+            try {
+                boolean freshInstall = SchemaManager.ensure(opening);
+                if (freshInstall) {
+                    // Pull anything left over from the JSON era into the new schema. Idempotent;
+                    // no-ops once the source files have been renamed to *.imported.
+                    new JsonImporter(dir).importIfNeeded(opening);
+                }
+            } catch (SQLException e) {
+                opening.close();
+                throw e;
+            }
+
+            db = opening;
+
+            // Best-effort daily snapshot. Failure here must never block app startup, so the
+            // SnapshotManager swallows its own errors.
+            try { SnapshotManager.runDaily(db, dir); } catch (Throwable ignore) { }
+        }
     }
 }

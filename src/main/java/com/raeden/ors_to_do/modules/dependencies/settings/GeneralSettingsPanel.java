@@ -120,6 +120,9 @@ public class GeneralSettingsPanel extends VBox {
         CheckBox chkSidebarCount = new CheckBox();
         chkSidebarCount.setSelected(appStats.isShowSidebarTaskCount());
 
+        CheckBox chkSidebarRetract = new CheckBox();
+        chkSidebarRetract.setSelected(appStats.isSidebarSeparatorsCollapsible());
+
         ComboBox<String> themeBox = new ComboBox<>();
         themeBox.getItems().addAll("Default", "Dark", "Green", "Blue", "Purple");
         themeBox.setValue(appStats.getCheckboxTheme());
@@ -211,6 +214,7 @@ public class GeneralSettingsPanel extends VBox {
                 createSettingRow("Always on Top", "Pins the Task Tracker window above all other applications.", alwaysOnTopCheck, "#C586C0"),
                 createSettingRow("Enable 'Text to Task'", "Allows pasting bulk text in the context menu to automatically generate multiple tasks.", chkTextToTask, "#C586C0"),
                 createSettingRow("Show Sidebar Active Count", "Displays the number of unfinished tasks directly on the sidebar buttons.", chkSidebarCount, "#C586C0"),
+                createSettingRow("Retractable Sidebar Separators", "Lets sidebar separators be clicked to hide/show the section buttons below them. When turned off, every separator is immediately collapsed and click/hover is disabled.", chkSidebarRetract, "#569CD6"),
                 createSettingRow("Enable Custom Stats", "Turns on the RPG points system across the entire application and tracks them in Analytics.", chkGlobalStats, "#B5CEA8"),
                 createSettingRow("Expanded Stats Info", "Shows the full stat name, category (Reward/Cost/Penalty), and custom colors on task cards instead of compact icons.", chkExpandedStats, "#B5CEA8")
         );
@@ -259,6 +263,7 @@ public class GeneralSettingsPanel extends VBox {
             appStats.setGlobalStatsEnabled(chkGlobalStats.isSelected());
             appStats.setEnableTextToTask(chkTextToTask.isSelected());
             appStats.setShowSidebarTaskCount(chkSidebarCount.isSelected());
+            appStats.setSidebarSeparatorsCollapsible(chkSidebarRetract.isSelected());
             appStats.setCheckboxTheme(themeBox.getValue());
             appStats.setFocusInactivityThreshold(inactivitySpinner.getValue());
             appStats.setExpandStatMiniCards(chkExpandedStats.isSelected());
@@ -292,6 +297,17 @@ public class GeneralSettingsPanel extends VBox {
         chkExpandedStats.setOnAction(e -> autoSaveTrigger.run());
         chkTextToTask.setOnAction(e -> autoSaveTrigger.run());
         chkSidebarCount.setOnAction(e -> autoSaveTrigger.run());
+        chkSidebarRetract.setOnAction(e -> {
+            // When the user disables the toggle, instantly collapse every separator so the
+            // sidebar drops into compact (label-only) mode. The autoSave below then writes the
+            // new flag + the freshly collapsed state in one shot.
+            if (!chkSidebarRetract.isSelected()) {
+                for (SectionConfig sc : appStats.getSections()) {
+                    if (sc.isSeparator()) appStats.setSeparatorCollapsed(sc.getId(), true);
+                }
+            }
+            autoSaveTrigger.run();
+        });
         themeBox.setOnAction(e -> autoSaveTrigger.run());
 
         alwaysOnTopCheck.setOnAction(e -> {

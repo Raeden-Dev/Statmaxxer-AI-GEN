@@ -267,6 +267,19 @@ public class AppStats implements Serializable {
      * preserves the user's expand/collapse choices across restarts.
      */
     /**
+     * Master switch for sidebar separator retractability. When {@code true} (default), separators
+     * are clickable: hovering them shows a chevron, clicking toggles whether the section buttons
+     * below the separator are visible. When {@code false}, separators behave like simple static
+     * dividers (no hover, no click); turning the toggle off also collapses every separator so the
+     * sidebar drops into a compact label-only mode the user can return from by re-enabling.
+     */
+    private Boolean sidebarSeparatorsCollapsible = null;
+    public boolean isSidebarSeparatorsCollapsible() {
+        return sidebarSeparatorsCollapsible == null || sidebarSeparatorsCollapsible;
+    }
+    public void setSidebarSeparatorsCollapsible(boolean v) { this.sidebarSeparatorsCollapsible = v; }
+
+    /**
      * Per-separator collapse state in the sidebar. Keys are separator section ids; value is
      * {@code true} when the user has collapsed the separator (every section button below it,
      * up to the next separator, is hidden). Persisted so the sidebar reopens in the same shape.
