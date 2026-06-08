@@ -17,7 +17,12 @@ public class DangerZonePanel extends VBox {
     private Runnable refreshCallback;
     private final double BUTTON_WIDTH = 200.0;
 
-    private FlowPane wipePane;
+    /** Buttons that clear individual sections live here, under the "Sections" header. */
+    private FlowPane sectionsPane;
+    /** Everything else (archive, analytics, stats, history, full reset) lives here, under "Others". */
+    private FlowPane othersPane;
+    /** Header above the section-wipe buttons; hidden when there are no real sections. */
+    private Label sectionsHeader;
 
     public DangerZonePanel(AppStats appStats, List<TaskItem> globalDatabase, Runnable refreshCallback) {
         super(15);
@@ -29,31 +34,47 @@ public class DangerZonePanel extends VBox {
         Label dangerLabel = new Label("Danger Zone");
         dangerLabel.setStyle("-fx-text-fill: #FF6666; -fx-font-size: 16px; -fx-font-weight: bold;");
 
-        wipePane = new FlowPane(15, 15);
+        sectionsHeader = createGroupHeader("Sections");
+        sectionsPane = new FlowPane(15, 15);
 
-        getChildren().addAll(dangerLabel, wipePane);
+        Label othersHeader = createGroupHeader("Others");
+        othersPane = new FlowPane(15, 15);
+
+        // A little breathing room above the "Others" group so the two clusters read as separate.
+        VBox.setMargin(othersHeader, new javafx.geometry.Insets(5, 0, 0, 0));
+
+        getChildren().addAll(dangerLabel, sectionsHeader, sectionsPane, othersHeader, othersPane);
         refreshDangerZone();
     }
 
     public void refreshDangerZone() {
-        wipePane.getChildren().clear();
+        sectionsPane.getChildren().clear();
+        othersPane.getChildren().clear();
 
-        // 1. Dynamic Section Wipe Buttons (Keep Red)
+        // --- Group 1: per-section wipe buttons (Keep Red) ---
         for (SectionConfig section : appStats.getSections()) {
             // --- FIXED: Prevent Separators from generating Wipe Buttons ---
             if (!section.isSeparator()) {
                 Button wipeBtn = createDangerButton("Wipe " + section.getName(), "#FF6666");
                 wipeBtn.setOnAction(e -> wipeList(globalDatabase, section.getId(), refreshCallback));
-                wipePane.getChildren().add(wipeBtn);
+                sectionsPane.getChildren().add(wipeBtn);
             }
         }
 
-        // 2. Wipe Archive Button (Purple)
+        // Hide the "Sections" header + pane entirely when there are no real sections to wipe.
+        boolean hasSections = !sectionsPane.getChildren().isEmpty();
+        sectionsHeader.setVisible(hasSections);
+        sectionsHeader.setManaged(hasSections);
+        sectionsPane.setVisible(hasSections);
+        sectionsPane.setManaged(hasSections);
+
+        // --- Group 2: everything else ---
+        // Wipe Archive Button (Purple)
         Button wipeArchiveBtn = createDangerButton("Empty Archive", "#C586C0");
         wipeArchiveBtn.setOnAction(e -> wipeList(globalDatabase, "ARCHIVED_FLAG", refreshCallback));
-        wipePane.getChildren().add(wipeArchiveBtn);
+        othersPane.getChildren().add(wipeArchiveBtn);
 
-        // 3. Reset Analytics Button (Yellow)
+        // Reset Analytics Button (Yellow)
         Button resetAnalyticsBtn = createDangerButton("Reset Global Analytics", "#FFD700");
         resetAnalyticsBtn.setOnAction(e -> {
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Are you sure you want to permanently reset all analytics?", ButtonType.YES, ButtonType.NO);
@@ -76,7 +97,7 @@ public class DangerZonePanel extends VBox {
                 }
             });
         });
-        wipePane.getChildren().add(resetAnalyticsBtn);
+        othersPane.getChildren().add(resetAnalyticsBtn);
 
         // 4. Wipe RPG Stats Button (Sea Blue)
         Button wipeStatsBtn = createDangerButton("Reset Stat Progress", "#48D1CC");
@@ -105,7 +126,7 @@ public class DangerZonePanel extends VBox {
                 }
             });
         });
-        wipePane.getChildren().add(wipeStatsBtn);
+        othersPane.getChildren().add(wipeStatsBtn);
 
         // 5. Deleted Tasks History Button
         Button historyBtn = new Button("View Deleted Tasks History");
@@ -114,7 +135,7 @@ public class DangerZonePanel extends VBox {
         historyBtn.setOnAction(e -> {
             DeletedHistoryDialog.show(appStats, refreshCallback);
         });
-        wipePane.getChildren().add(historyBtn);
+        othersPane.getChildren().add(historyBtn);
 
         // 6. Full App Reset Button
         Button fullResetBtn = new Button("Full App Reset");
@@ -148,7 +169,14 @@ public class DangerZonePanel extends VBox {
                 }
             });
         });
-        wipePane.getChildren().add(fullResetBtn);
+        othersPane.getChildren().add(fullResetBtn);
+    }
+
+    /** Small, muted sub-header used to label a group of danger-zone buttons. */
+    private Label createGroupHeader(String text) {
+        Label l = new Label(text);
+        l.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 12px; -fx-font-weight: bold; -fx-letter-spacing: 1px;");
+        return l;
     }
 
     private Button createDangerButton(String text, String colorHex) {

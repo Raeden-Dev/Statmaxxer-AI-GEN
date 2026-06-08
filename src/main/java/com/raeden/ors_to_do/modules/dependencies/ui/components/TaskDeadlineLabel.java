@@ -29,15 +29,9 @@ public class TaskDeadlineLabel extends Label {
             if (dur.isNegative() || dur.isZero()) {
                 setText("🚨 OVERDUE");
 
-                boolean hasAnyPenalty = task.getPenaltyPoints() > 0 || (config.isEnableStatsSystem() && !task.getStatPenalties().isEmpty());
-                if (!task.isFinished() && hasAnyPenalty && !task.isPenaltyApplied()) {
-                    task.setPenaltyApplied(true);
-                    appStats.setGlobalScore(appStats.getGlobalScore() - task.getPenaltyPoints());
-
-                    if (config.isEnableStatsSystem()) {
-                        TaskActionHandler.processRPGStats(task, appStats, false);
-                    }
-
+                // Shared "missed task" penalty (penalty points + the task's Stat Penalties map).
+                if (TaskActionHandler.applyMissPenalty(task, appStats, config)) {
+                    TaskActionHandler.evaluateThresholdDebuffs(appStats);
                     StorageManager.saveStats(appStats);
                     StorageManager.saveTasks(globalDatabase);
                     Platform.runLater(() -> {

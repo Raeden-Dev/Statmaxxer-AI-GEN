@@ -2,6 +2,7 @@ package com.raeden.ors_to_do.modules.dependencies.services;
 
 import com.raeden.ors_to_do.dependencies.models.*;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
+import com.raeden.ors_to_do.modules.dependencies.ui.utils.TaskActionHandler;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ public class DailyRolloverManager {
 
         if (today.isAfter(lastOpened)) {
             long daysMissed = ChronoUnit.DAYS.between(lastOpened, today);
+            boolean penaltyApplied = false;   // accumulates across all reset sections
 
             for (SectionConfig section : appStats.getSections()) {
                 if (section.getResetIntervalHours() > 0) {
@@ -56,22 +58,34 @@ public class DailyRolloverManager {
                         }
                     }
 
-                    // --- Reset-interval archive sweep ---
-                    // Previously this loop archived (and silently finished) **every** unarchived
-                    // task in the section, which:
-                    //   - wiped progress on counter/repeating cards (which are meant to persist),
-                    //   - silently flipped incomplete tasks to "finished" so they polluted streak
-                    //     stats and challenge-completion detection.
-                    // Now: only **completed**, non-counter, non-repeating tasks are archived. Tasks
-                    // that weren't finished by the deadline simply stay on the page (the streak
-                    // calculation above already counted them as a miss).
-                    for (TaskItem task : taskDatabase) {
+                    // --- Reset sweep ---
+                    // A resettable page must return to exactly the cards its templates produce, so
+                    // every pre-existing (non-archived) task in the section is resolved here, BEFORE
+                    // the new template cards are added below:
+                    //   - completed  -> archived (its rewards were already applied when checked off)
+                    //   - incomplete -> the configured miss penalty is applied, then the card is
+                    //                   deleted outright.
+                    // This includes counter / repeating cards: a counter that reached its target
+                    // counts as completed; one below target counts as incomplete. Without this the
+                    // page would stack leftover cards on top of each freshly-added template set.
+                    java.util.Iterator<TaskItem> sweep = taskDatabase.iterator();
+                    while (sweep.hasNext()) {
+                        TaskItem task = sweep.next();
                         if (!section.getId().equals(task.getSectionId())) continue;
                         if (task.isArchived()) continue;
-                        if (!task.isFinished()) continue;             // keep incomplete tasks visible
-                        if (task.isCounterMode()) continue;           // counters persist across resets
-                        if (task.isRepeatingMode()) continue;         // repeaters persist across resets
-                        task.setArchived(true);
+
+                        boolean completed = task.isFinished()
+                                || (task.isCounterMode() && task.getMaxCount() > 0 && task.getCurrentCount() >= task.getMaxCount());
+
+                        if (completed) {
+                            // Maxed counters may not carry the finished flag; set it so they read
+                            // correctly in the Archive.
+                            if (!task.isFinished()) task.setFinished(true);
+                            task.setArchived(true);
+                        } else {
+                            if (TaskActionHandler.applyMissPenalty(task, appStats, section)) penaltyApplied = true;
+                            sweep.remove();
+                        }
                     }
 
                     CustomPriority fallbackPrio = appStats.getCustomPriorities().isEmpty() ? null : appStats.getCustomPriorities().get(0);
@@ -132,6 +146,10 @@ public class DailyRolloverManager {
                     }
                 }
             }
+
+            // Re-check threshold auras once if any reset miss-penalty moved a stat across a
+            // threshold (kept out of the per-task loop to avoid redundant evaluations).
+            if (penaltyApplied) TaskActionHandler.evaluateThresholdDebuffs(appStats);
 
             processRPGRollover(appStats, taskDatabase);
 

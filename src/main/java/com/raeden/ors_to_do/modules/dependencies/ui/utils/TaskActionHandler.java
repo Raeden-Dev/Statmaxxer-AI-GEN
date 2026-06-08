@@ -249,6 +249,45 @@ public class TaskActionHandler {
         }
     }
 
+    /**
+     * Applies the "missed task" penalty exactly once: subtracts the task's {@code penaltyPoints}
+     * from the global score and reduces each stat named in the task's {@code statPenalties} map.
+     *
+     * <p>Previously the {@code statPenalties} map was shown in the UI but never actually applied to
+     * any stat — the only "miss" penalty in the app reversed the would-be rewards. This is the
+     * single, shared penalty path used by both the deadline-miss handler and the daily-reset
+     * sweep, so "missing a task" costs the same no matter how the miss is detected.</p>
+     *
+     * <p>The method mutates {@code appStats} in memory only — it does <b>not</b> persist or
+     * re-evaluate threshold auras; the caller decides when to save and whether to call
+     * {@link #evaluateThresholdDebuffs(AppStats)}.</p>
+     *
+     * @return {@code true} if a penalty was actually applied (caller should persist), {@code false}
+     *         when the task is finished, already penalised, or carries no penalty at all.
+     */
+    public static boolean applyMissPenalty(TaskItem task, AppStats appStats, SectionConfig config) {
+        if (task == null || task.isFinished() || task.isPenaltyApplied()) return false;
+
+        boolean statsEnabled = config != null && config.isEnableStatsSystem();
+        boolean hasStatPenalties = statsEnabled && task.getStatPenalties() != null && !task.getStatPenalties().isEmpty();
+        boolean hasAnyPenalty = task.getPenaltyPoints() > 0 || hasStatPenalties;
+        if (!hasAnyPenalty) return false;
+
+        task.setPenaltyApplied(true);
+        appStats.setGlobalScore(appStats.getGlobalScore() - task.getPenaltyPoints());
+
+        if (hasStatPenalties && appStats.isGlobalStatsEnabled()) {
+            for (CustomStat stat : appStats.getCustomStats()) {
+                int pen = getStatValue(task.getStatPenalties(), stat);
+                if (pen > 0) {
+                    stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - pen));
+                    stat.setLifetimeLost(stat.getLifetimeLost() + pen);
+                }
+            }
+        }
+        return true;
+    }
+
     public static void processRPGStats(TaskItem task, AppStats appStats, boolean isCompletion) {
         if (!appStats.isGlobalStatsEnabled()) return;
 

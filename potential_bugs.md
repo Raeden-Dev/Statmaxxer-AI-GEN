@@ -23,9 +23,16 @@ Fixed in `ProgressionService.isDependencyUnlocked` — challenge dependencies no
 null, so dependents stay locked. Covered by `ProgressionServiceTest`.
 
 ### 4. Daily rollover archives & finishes counter / repeating tasks 🟧
-Fixed in `DailyRolloverManager.processDailyRollover` — the per-section sweep now only archives
-tasks that are **finished** and not counter / repeating cards. Incomplete tasks stay visible on
-the next day instead of being silently flipped to "finished".
+**Superseded by an explicit redesign (see below).** The original silent "archive + mark finished
+everything" bug is gone; the reset sweep is now a deliberate, documented behavior:
+- **Completed** cards (including counters at their target) → archived (rewards were already applied
+  at completion time, so they're not re-applied).
+- **Incomplete** cards (including counters below target and repeaters) → the task's miss penalty is
+  applied (`TaskActionHandler.applyMissPenalty`: subtract Penalty Points + apply the Stat Penalties
+  map), then the card is **deleted**.
+- Result: a resettable page always returns to exactly the count its templates produce, instead of
+  stacking leftover cards. The `statPenalties` map — previously displayed but never applied to any
+  stat — is now wired into both the reset sweep and the deadline-miss handler.
 
 ### 7. Expired challenge state is computed but never persisted 🟨
 Fixed in `ChallengeCard` — when a deadline passes without completion, the card now persists the
