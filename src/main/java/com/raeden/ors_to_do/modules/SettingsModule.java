@@ -2,6 +2,7 @@ package com.raeden.ors_to_do.modules;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
+import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.modules.dependencies.settings.*;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
@@ -12,7 +13,7 @@ import java.util.List;
 
 public class SettingsModule extends ScrollPane {
 
-    public SettingsModule(AppStats appStats, List<TaskItem> globalDatabase, Runnable refreshCallback) {
+    public SettingsModule(AppStats appStats, List<TaskItem> globalDatabase, Runnable refreshCallback, java.util.function.Consumer<String> onSwitchProfile) {
         setFitToWidth(true);
         setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
         setBorder(Border.EMPTY);
@@ -46,14 +47,29 @@ public class SettingsModule extends ScrollPane {
         };
         SectionManagerPanel sectionPanel = new SectionManagerPanel(appStats, globalDatabase, wrappedRefreshCallback, onSectionChanged);
 
+        // --- Collapsible (eye-toggle) wrappers for the three big sections so the settings page can
+        // be kept compact. Collapse state persists in AppStats. ---
+        CollapsibleSettingsSection sectionWrap = new CollapsibleSettingsSection(
+                "Dynamic Sections", sectionPanel, appStats.isSettingsPanelCollapsed("sections"),
+                collapsed -> { appStats.setSettingsPanelCollapsed("sections", collapsed); StorageManager.saveStats(appStats); });
+        CollapsibleSettingsSection statsWrap = new CollapsibleSettingsSection(
+                "Stat Configuration", statsManagerPanel, appStats.isSettingsPanelCollapsed("stats"),
+                collapsed -> { appStats.setSettingsPanelCollapsed("stats", collapsed); StorageManager.saveStats(appStats); });
+        CollapsibleSettingsSection priorityWrap = new CollapsibleSettingsSection(
+                "Priorities", priorityPanel, appStats.isSettingsPanelCollapsed("priorities"),
+                collapsed -> { appStats.setSettingsPanelCollapsed("priorities", collapsed); StorageManager.saveStats(appStats); });
+
+        ProfileManagerPanel profilePanel = new ProfileManagerPanel(onSwitchProfile);
+
         contentBox.getChildren().addAll(
                 helpPanel,
                 header,
-                sectionPanel,
+                profilePanel,
                 generalPanel,
+                sectionWrap,
                 templatePanel,
-                statsManagerPanel,
-                priorityPanel,
+                statsWrap,
+                priorityWrap,
                 dataPanel,
                 dangerPanel
         );

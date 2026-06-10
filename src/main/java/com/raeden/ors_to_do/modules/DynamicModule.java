@@ -52,7 +52,7 @@ public class DynamicModule extends StackPane {
         mainContent = new BorderPane();
         mainContent.setPadding(new Insets(15));
 
-        boolean isSpecialOverlay = config.isNotesPage() || config.isStatPage() || config.isPerkPage() || config.isChallengePage();
+        boolean isSpecialOverlay = config.isNotesPage() || config.isStatPage() || config.isPerkPage() || config.isChallengePage() || config.isCalendarPage();
         Runnable zenToggleAction = isSpecialOverlay ? () -> {} : this::toggleZenMode;
 
         zenOverlay = new ZenModeOverlay(config, appStats, globalDatabase, zenToggleAction, syncCallback, activeTimelines, this::reorderTasks);
@@ -65,6 +65,14 @@ public class DynamicModule extends StackPane {
         }
 
         getChildren().addAll(mainContent, zenOverlay);
+
+        // Calendar pages render their own full-page UI (month grid, navigation, brush, export) and
+        // don't use the task list / input panel / filter header at all.
+        if (config.isCalendarPage()) {
+            mainContent.setCenter(new com.raeden.ors_to_do.modules.dependencies.ui.layout.CalendarPage(config, appStats, globalDatabase, syncCallback));
+            return;
+        }
+
         mainContent.setTop(filterSortHeader);
 
         listContainer = new VBox(8);
@@ -101,7 +109,7 @@ public class DynamicModule extends StackPane {
     }
 
     private void toggleZenMode() {
-        if (config.isNotesPage() || config.isStatPage() || config.isPerkPage() || config.isChallengePage()) return;
+        if (config.isNotesPage() || config.isStatPage() || config.isPerkPage() || config.isChallengePage() || config.isCalendarPage()) return;
         isZenMode = !isZenMode;
 
         if (getScene() != null && getScene().getRoot() instanceof BorderPane) {
@@ -127,6 +135,7 @@ public class DynamicModule extends StackPane {
         for (Timeline t : activeTimelines) t.stop();
         activeTimelines.clear();
 
+        if (config.isCalendarPage()) return; // CalendarPage manages its own rendering & persistence
         if (isZenMode) { zenOverlay.refreshZenMode(false); return; }
 
         listContainer.getChildren().clear();

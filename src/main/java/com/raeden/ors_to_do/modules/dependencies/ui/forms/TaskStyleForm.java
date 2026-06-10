@@ -20,7 +20,9 @@ public class TaskStyleForm {
     private boolean allowStyling, allowIcons, allowPrefix;
 
     public void buildUI(GridPane grid, AtomicInteger rowIdx, TaskItem task, SectionConfig config) {
-        allowStyling = config != null && (config.isNotesPage() || config.isEnableTaskStyling());
+        // Link cards are always styleable (background + outline + sidebox) regardless of the
+        // section's "Enable Task Styling" flag, so they can be themed the same as ordinary cards.
+        allowStyling = task.isLinkCard() || (config != null && (config.isNotesPage() || config.isEnableTaskStyling()));
         allowIcons = config == null || config.isEnableIcons();
         allowPrefix = config == null || config.isShowPrefix();
 

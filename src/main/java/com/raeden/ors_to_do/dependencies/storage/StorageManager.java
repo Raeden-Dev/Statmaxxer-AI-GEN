@@ -44,6 +44,32 @@ public class StorageManager {
     /** Optional data-directory override — primarily for tests. {@code null} = use APP_DIR. */
     private static volatile File dataDirOverride;
 
+    /**
+     * Active profile id. Each profile is a fully separate "world" backed by its own DB file. The
+     * built-in {@code "default"} profile keeps the original {@code tasktracker.db} filename so
+     * existing installs are unaffected; other profiles live in {@code tasktracker_<id>.db}.
+     */
+    private static volatile String activeProfileId = "default";
+
+    /**
+     * Switches the active profile. Closes the current DB so the next access opens the new profile's
+     * database. Callers must reload tasks/stats and rebuild the UI afterwards.
+     */
+    public static synchronized void useProfile(String profileId) {
+        close();
+        activeProfileId = (profileId == null || profileId.isBlank()) ? "default" : profileId;
+    }
+
+    public static String getActiveProfileId() { return activeProfileId; }
+
+    /** Resolves the DB filename for the active profile. */
+    private static String dbFileName() {
+        if (activeProfileId == null || activeProfileId.equals("default")) return DB_FILE_NAME;
+        String safe = activeProfileId.replaceAll("[^a-zA-Z0-9_-]", "");
+        if (safe.isEmpty()) return DB_FILE_NAME;
+        return "tasktracker_" + safe + ".db";
+    }
+
     private StorageManager() { }
 
     // ---------------------------------------------------------------------
@@ -200,7 +226,7 @@ public class StorageManager {
                 throw new SQLException("Could not create data directory: " + dir);
             }
 
-            File dbFile = new File(dir, DB_FILE_NAME);
+            File dbFile = new File(dir, dbFileName());
             String url = "jdbc:sqlite:" + dbFile.getAbsolutePath().replace('\\', '/');
             Db opening = new Db(url);
             opening.open();

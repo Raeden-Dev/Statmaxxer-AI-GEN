@@ -3,6 +3,7 @@ package com.raeden.ors_to_do.dependencies.models;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class SectionConfig implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -29,6 +30,16 @@ public class SectionConfig implements Serializable {
     private boolean isStatPage = false;
     private boolean isPerkPage = false;
     private boolean isChallengePage = false;
+
+    // --- Calendar Page mode (per-month grid, mark days a task was done, colour the cell). ---
+    private boolean isCalendarPage = false;
+    private boolean calendarShowSegments = true;   // colour bands across the day cell
+    private boolean calendarShowDots = true;        // colour dots under the date number
+    private boolean allowCalendarManipulation = false; // mark past/future days, not just "today"
+    private boolean calendarGrantsXp = false;        // award Custom Stats XP on completion
+    private List<CalendarTask> calendarTasks = new ArrayList<>();
+    /** ISO date string ("yyyy-MM-dd") -> list of CalendarTask ids completed that day. */
+    private Map<String, List<String>> calendarCompletions = new java.util.HashMap<>();
 
     private boolean showPriority = true;
     private boolean trackTime = false;
@@ -128,6 +139,62 @@ public class SectionConfig implements Serializable {
 
     public boolean isChallengePage() { return isChallengePage; }
     public void setChallengePage(boolean challengePage) { this.isChallengePage = challengePage; }
+
+    public boolean isCalendarPage() { return isCalendarPage; }
+    public void setCalendarPage(boolean calendarPage) { this.isCalendarPage = calendarPage; }
+
+    public boolean isCalendarShowSegments() { return calendarShowSegments; }
+    public void setCalendarShowSegments(boolean v) { this.calendarShowSegments = v; }
+
+    public boolean isCalendarShowDots() { return calendarShowDots; }
+    public void setCalendarShowDots(boolean v) { this.calendarShowDots = v; }
+
+    public boolean isAllowCalendarManipulation() { return allowCalendarManipulation; }
+    public void setAllowCalendarManipulation(boolean v) { this.allowCalendarManipulation = v; }
+
+    public boolean isCalendarGrantsXp() { return calendarGrantsXp; }
+    public void setCalendarGrantsXp(boolean v) { this.calendarGrantsXp = v; }
+
+    public List<CalendarTask> getCalendarTasks() {
+        if (calendarTasks == null) calendarTasks = new ArrayList<>();
+        return calendarTasks;
+    }
+    public void setCalendarTasks(List<CalendarTask> calendarTasks) { this.calendarTasks = calendarTasks; }
+
+    public Map<String, List<String>> getCalendarCompletions() {
+        if (calendarCompletions == null) calendarCompletions = new java.util.HashMap<>();
+        return calendarCompletions;
+    }
+    public void setCalendarCompletions(Map<String, List<String>> m) { this.calendarCompletions = m; }
+
+    /** @return the list of CalendarTask ids completed on {@code isoDate} (never null). */
+    public List<String> getCompletedTaskIds(String isoDate) {
+        List<String> ids = getCalendarCompletions().get(isoDate);
+        return ids == null ? new ArrayList<>() : ids;
+    }
+
+    public boolean isTaskCompletedOn(String isoDate, String taskId) {
+        List<String> ids = getCalendarCompletions().get(isoDate);
+        return ids != null && ids.contains(taskId);
+    }
+
+    /** Toggles completion of {@code taskId} on {@code isoDate}. @return true if now completed. */
+    public boolean toggleCompletion(String isoDate, String taskId) {
+        List<String> ids = getCalendarCompletions().computeIfAbsent(isoDate, k -> new ArrayList<>());
+        if (ids.contains(taskId)) {
+            ids.remove(taskId);
+            if (ids.isEmpty()) getCalendarCompletions().remove(isoDate);
+            return false;
+        }
+        ids.add(taskId);
+        return true;
+    }
+
+    public CalendarTask findCalendarTask(String taskId) {
+        if (taskId == null) return null;
+        for (CalendarTask t : getCalendarTasks()) if (taskId.equals(t.getId())) return t;
+        return null;
+    }
 
     public boolean isShowPriority() { return showPriority; }
     public void setShowPriority(boolean showPriority) { this.showPriority = showPriority; }

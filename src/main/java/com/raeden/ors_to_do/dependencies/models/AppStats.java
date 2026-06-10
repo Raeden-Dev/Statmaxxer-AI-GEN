@@ -20,6 +20,7 @@ public class AppStats implements Serializable {
     private boolean showSidebarTaskCount = true;
 
     private int taskFontSize = 14;
+    private String taskFontFamily = "Default";
     private String checkboxTheme = "Default";
     private int zenModeThreshold = 20;
     private int focusInactivityThreshold = 5;
@@ -100,6 +101,8 @@ public class AppStats implements Serializable {
     public void setShowSidebarTaskCount(boolean showSidebarTaskCount) { this.showSidebarTaskCount = showSidebarTaskCount; }
     public int getTaskFontSize() { return taskFontSize == 0 ? 14 : taskFontSize; }
     public void setTaskFontSize(int taskFontSize) { this.taskFontSize = taskFontSize; }
+    public String getTaskFontFamily() { return taskFontFamily == null ? "Default" : taskFontFamily; }
+    public void setTaskFontFamily(String taskFontFamily) { this.taskFontFamily = taskFontFamily; }
     public String getCheckboxTheme() { return checkboxTheme == null ? "Default" : checkboxTheme; }
     public void setCheckboxTheme(String checkboxTheme) { this.checkboxTheme = checkboxTheme; }
     public int getZenModeThreshold() { return zenModeThreshold <= 0 ? 20 : zenModeThreshold; }
@@ -300,6 +303,26 @@ public class AppStats implements Serializable {
         else getCollapsedSeparators().remove(separatorId);
     }
 
+    /**
+     * Collapse state for the eye-toggle settings sections (Dynamic Sections, Stat Configuration,
+     * Priorities). Keyed by a stable panel key; {@code true} = hidden. Persisted so the Settings
+     * page reopens in the same shape.
+     */
+    private Map<String, Boolean> collapsedSettingsPanels = new HashMap<>();
+    public Map<String, Boolean> getCollapsedSettingsPanels() {
+        if (collapsedSettingsPanels == null) collapsedSettingsPanels = new HashMap<>();
+        return collapsedSettingsPanels;
+    }
+    public boolean isSettingsPanelCollapsed(String key) {
+        Boolean v = getCollapsedSettingsPanels().get(key);
+        return v != null && v;
+    }
+    public void setSettingsPanelCollapsed(String key, boolean collapsed) {
+        if (key == null) return;
+        if (collapsed) getCollapsedSettingsPanels().put(key, true);
+        else getCollapsedSettingsPanels().remove(key);
+    }
+
     private Map<String, java.util.Set<String>> collapsedCategories = new HashMap<>();
     public Map<String, java.util.Set<String>> getCollapsedCategories() {
         if (collapsedCategories == null) collapsedCategories = new HashMap<>();
@@ -399,6 +422,7 @@ public class AppStats implements Serializable {
         this.enableTextToTask = other.enableTextToTask;
         this.showSidebarTaskCount = other.showSidebarTaskCount;
         this.taskFontSize = other.taskFontSize;
+        this.taskFontFamily = other.taskFontFamily;
         this.checkboxTheme = other.checkboxTheme;
         this.zenModeThreshold = other.zenModeThreshold;
         this.focusInactivityThreshold = other.focusInactivityThreshold;

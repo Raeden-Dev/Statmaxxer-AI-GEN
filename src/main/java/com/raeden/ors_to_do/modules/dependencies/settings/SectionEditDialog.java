@@ -88,6 +88,38 @@ public class SectionEditDialog {
         basicInfoRow.getChildren().addAll(nameBox, colorBox, intervalBox, preventEditingBox);
         content.getChildren().addAll(basicInfoRow, new Separator());
 
+        // --- Special Modes Box (moved up: sits directly below Name / Theme Color / etc. and
+        // above the feature checkboxes, so the page "type" is chosen before its options). ---
+        VBox specialModesBox = new VBox(10);
+        specialModesBox.setStyle("-fx-border-color: #555555; -fx-border-radius: 5; -fx-padding: 10; -fx-background-color: #252526; -fx-background-radius: 5;");
+        Label modeHeader = new Label("Special Page Modes (Select up to One):"); modeHeader.setStyle("-fx-text-fill: #AAAAAA; -fx-font-style: italic; -fx-font-size: 12px;");
+        FlowPane modeToggles = new FlowPane(20, 10);
+
+        CheckBox notesPageCheck = new CheckBox("Notes Page"); notesPageCheck.setSelected(config.isNotesPage()); notesPageCheck.setStyle("-fx-text-fill: #4EC9B0; -fx-font-weight: bold;");
+        CheckBox statPageCheck = new CheckBox("Stat Page"); statPageCheck.setSelected(config.isStatPage()); statPageCheck.setStyle("-fx-text-fill: #FF6666; -fx-font-weight: bold;");
+        CheckBox perkPageCheck = new CheckBox("Perk Page"); perkPageCheck.setSelected(config.isPerkPage()); perkPageCheck.setStyle("-fx-text-fill: #FFD700; -fx-font-weight: bold;");
+        CheckBox rewardsPageCheck = new CheckBox("Rewards Shop"); rewardsPageCheck.setSelected(config.isRewardsPage()); rewardsPageCheck.setStyle("-fx-text-fill: #569CD6; -fx-font-weight: bold;");
+        CheckBox challengePageCheck = new CheckBox("Challenge Page"); challengePageCheck.setSelected(config.isChallengePage()); challengePageCheck.setStyle("-fx-text-fill: #FF8C00; -fx-font-weight: bold;");
+        CheckBox calendarPageCheck = new CheckBox("Calendar Page"); calendarPageCheck.setSelected(config.isCalendarPage()); calendarPageCheck.setStyle("-fx-text-fill: #C586C0; -fx-font-weight: bold;");
+
+        modeToggles.getChildren().addAll(notesPageCheck, statPageCheck, perkPageCheck, rewardsPageCheck, challengePageCheck, calendarPageCheck);
+        specialModesBox.getChildren().addAll(modeHeader, modeToggles);
+        content.getChildren().addAll(specialModesBox, new Separator());
+
+        // --- Calendar-only options (display style, manipulation of past days, XP grant). Shown only
+        // when Calendar Page is selected; wired up after the master state engine below. ---
+        VBox calendarOptionsBox = new VBox(8);
+        calendarOptionsBox.setStyle("-fx-border-color: #C586C0; -fx-border-radius: 5; -fx-padding: 10; -fx-background-color: #2A2330; -fx-background-radius: 5;");
+        Label calHeader = new Label("Calendar Options:"); calHeader.setStyle("-fx-text-fill: #C586C0; -fx-font-weight: bold; -fx-font-size: 12px;");
+        CheckBox calSegmentsCheck = new CheckBox("Show Segments (color bands on the day)"); calSegmentsCheck.setSelected(config.isCalendarShowSegments()); calSegmentsCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calDotsCheck = new CheckBox("Show Dots (color dots under the date)"); calDotsCheck.setSelected(config.isCalendarShowDots()); calDotsCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calManipulationCheck = new CheckBox("Allow Calendar Manipulation (mark past/future days)"); calManipulationCheck.setSelected(config.isAllowCalendarManipulation()); calManipulationCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calGrantXpCheck = new CheckBox("Grant rewards on completion (XP / score / debuffs / hooks)"); calGrantXpCheck.setSelected(config.isCalendarGrantsXp()); calGrantXpCheck.setStyle("-fx-text-fill: white;");
+        Label calDesc = new Label("Define the calendar's tasks on the page itself. Mark a day done to color it; toggle which indicators show above.");
+        calDesc.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;"); calDesc.setWrapText(true);
+        calendarOptionsBox.getChildren().addAll(calHeader, calSegmentsCheck, calDotsCheck, calManipulationCheck, calGrantXpCheck, calDesc);
+        content.getChildren().add(calendarOptionsBox);
+
         // --- Features Grid ---
         GridPane featuresGrid = new GridPane(); featuresGrid.setHgap(20); featuresGrid.setVgap(15);
         ColumnConstraints col1 = new ColumnConstraints(); col1.setPercentWidth(50);
@@ -153,30 +185,18 @@ public class SectionEditDialog {
 
         content.getChildren().addAll(featuresGrid, new Separator());
 
-        // --- Special Modes Box ---
-        VBox specialModesBox = new VBox(10);
-        specialModesBox.setStyle("-fx-border-color: #555555; -fx-border-radius: 5; -fx-padding: 10; -fx-background-color: #252526; -fx-background-radius: 5;");
-        Label modeHeader = new Label("Special Page Modes (Select up to One):"); modeHeader.setStyle("-fx-text-fill: #AAAAAA; -fx-font-style: italic; -fx-font-size: 12px;");
-        FlowPane modeToggles = new FlowPane(20, 10);
-
-        CheckBox notesPageCheck = new CheckBox("Notes Page"); notesPageCheck.setSelected(config.isNotesPage()); notesPageCheck.setStyle("-fx-text-fill: #4EC9B0; -fx-font-weight: bold;");
-        CheckBox statPageCheck = new CheckBox("Stat Page"); statPageCheck.setSelected(config.isStatPage()); statPageCheck.setStyle("-fx-text-fill: #FF6666; -fx-font-weight: bold;");
-        CheckBox perkPageCheck = new CheckBox("Perk Page"); perkPageCheck.setSelected(config.isPerkPage()); perkPageCheck.setStyle("-fx-text-fill: #FFD700; -fx-font-weight: bold;");
-        CheckBox rewardsPageCheck = new CheckBox("Rewards Shop"); rewardsPageCheck.setSelected(config.isRewardsPage()); rewardsPageCheck.setStyle("-fx-text-fill: #569CD6; -fx-font-weight: bold;");
-        CheckBox challengePageCheck = new CheckBox("Challenge Page"); challengePageCheck.setSelected(config.isChallengePage()); challengePageCheck.setStyle("-fx-text-fill: #FF8C00; -fx-font-weight: bold;");
-
-        modeToggles.getChildren().addAll(notesPageCheck, statPageCheck, perkPageCheck, rewardsPageCheck, challengePageCheck);
-        specialModesBox.getChildren().addAll(modeHeader, modeToggles);
-        content.getChildren().add(specialModesBox);
-
         // --- Master State Engine ---
         Runnable updateUIState = () -> {
             boolean isNotes = notesPageCheck.isSelected(); boolean isStat = statPageCheck.isSelected();
             boolean isPerk = perkPageCheck.isSelected(); boolean isReward = rewardsPageCheck.isSelected();
             boolean isChallenge = challengePageCheck.isSelected();
-            boolean isSpecial = isNotes || isStat || isPerk || isReward || isChallenge;
+            boolean isCalendar = calendarPageCheck.isSelected();
+            boolean isSpecial = isNotes || isStat || isPerk || isReward || isChallenge || isCalendar;
 
-            if (isStat || isPerk || isReward || isChallenge) {
+            calendarOptionsBox.setVisible(isCalendar);
+            calendarOptionsBox.setManaged(isCalendar);
+
+            if (isStat || isPerk || isReward || isChallenge || isCalendar) {
                 intervalSpinner.setDisable(true); if (intervalSpinner.getValue() != 0) intervalSpinner.getValueFactory().setValue(0);
                 autoArchiveCheck.setDisable(true); autoArchiveCheck.setSelected(false);
             } else {
@@ -211,11 +231,12 @@ public class SectionEditDialog {
         enableScoreCheck.setOnAction(e -> updateUIState.run());
         enableStatsSystemCheck.setOnAction(e -> updateUIState.run());
 
-        rewardsPageCheck.setOnAction(e -> { if(rewardsPageCheck.isSelected()) { notesPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); } updateUIState.run(); });
-        notesPageCheck.setOnAction(e -> { if(notesPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); } updateUIState.run(); });
-        statPageCheck.setOnAction(e -> { if(statPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); } updateUIState.run(); });
-        perkPageCheck.setOnAction(e -> { if(perkPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); statPageCheck.setSelected(false); challengePageCheck.setSelected(false); } updateUIState.run(); });
-        challengePageCheck.setOnAction(e -> { if(challengePageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); } updateUIState.run(); });
+        rewardsPageCheck.setOnAction(e -> { if(rewardsPageCheck.isSelected()) { notesPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
+        notesPageCheck.setOnAction(e -> { if(notesPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
+        statPageCheck.setOnAction(e -> { if(statPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
+        perkPageCheck.setOnAction(e -> { if(perkPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); statPageCheck.setSelected(false); challengePageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
+        challengePageCheck.setOnAction(e -> { if(challengePageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
+        calendarPageCheck.setOnAction(e -> { if(calendarPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); notesPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); } updateUIState.run(); });
 
         presetBox.setOnAction(e -> {
             SectionConfig p = presetBox.getValue();
@@ -232,6 +253,9 @@ public class SectionEditDialog {
                 enableLinkCardsCheck.setSelected(p.isEnableLinkCards()); notesPageCheck.setSelected(p.isNotesPage());
                 statPageCheck.setSelected(p.isStatPage()); perkPageCheck.setSelected(p.isPerkPage());
                 challengePageCheck.setSelected(p.isChallengePage());
+                calendarPageCheck.setSelected(p.isCalendarPage());
+                calSegmentsCheck.setSelected(p.isCalendarShowSegments()); calDotsCheck.setSelected(p.isCalendarShowDots());
+                calManipulationCheck.setSelected(p.isAllowCalendarManipulation()); calGrantXpCheck.setSelected(p.isCalendarGrantsXp());
                 enableOptionalTasksCheck.setSelected(p.isEnableOptionalTasks()); enableTaskStylingCheck.setSelected(p.isEnableTaskStyling());
                 enableTimedTasksCheck.setSelected(p.isEnableTimedTasks());
                 allowRepeatingTasksCheck.setSelected(p.isAllowRepeatingTasks());
@@ -263,6 +287,9 @@ public class SectionEditDialog {
                 newPreset.setEnableLinkCards(enableLinkCardsCheck.isSelected()); newPreset.setNotesPage(notesPageCheck.isSelected());
                 newPreset.setStatPage(statPageCheck.isSelected()); newPreset.setPerkPage(perkPageCheck.isSelected());
                 newPreset.setChallengePage(challengePageCheck.isSelected());
+                newPreset.setCalendarPage(calendarPageCheck.isSelected());
+                newPreset.setCalendarShowSegments(calSegmentsCheck.isSelected()); newPreset.setCalendarShowDots(calDotsCheck.isSelected());
+                newPreset.setAllowCalendarManipulation(calManipulationCheck.isSelected()); newPreset.setCalendarGrantsXp(calGrantXpCheck.isSelected());
                 newPreset.setEnableOptionalTasks(enableOptionalTasksCheck.isSelected()); newPreset.setEnableTaskStyling(enableTaskStylingCheck.isSelected());
                 newPreset.setEnableTimedTasks(enableTimedTasksCheck.isSelected());
                 newPreset.setAllowRepeatingTasks(allowRepeatingTasksCheck.isSelected());
@@ -306,6 +333,9 @@ public class SectionEditDialog {
                 config.setEnableScore(enableScoreCheck.isSelected()); config.setEnableLinks(enableLinksCheck.isSelected());
                 config.setRewardsPage(rewardsPageCheck.isSelected()); config.setStatPage(statPageCheck.isSelected());
                 config.setPerkPage(perkPageCheck.isSelected()); config.setChallengePage(challengePageCheck.isSelected());
+                config.setCalendarPage(calendarPageCheck.isSelected());
+                config.setCalendarShowSegments(calSegmentsCheck.isSelected()); config.setCalendarShowDots(calDotsCheck.isSelected());
+                config.setAllowCalendarManipulation(calManipulationCheck.isSelected()); config.setCalendarGrantsXp(calGrantXpCheck.isSelected());
                 config.setAutoArchive(autoArchiveCheck.isSelected()); config.setShowPriority(showPriorityCheck.isSelected());
                 config.setTrackTime(trackTimeCheck.isSelected()); config.setShowTaskType(showTaskTypeCheck.isSelected());
                 config.setAllowFavorite(favoriteCheck.isSelected()); config.setShowAnalytics(showAnalyticsCheck.isSelected());

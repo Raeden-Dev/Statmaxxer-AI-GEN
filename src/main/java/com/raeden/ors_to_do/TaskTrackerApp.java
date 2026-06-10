@@ -2,6 +2,7 @@ package com.raeden.ors_to_do;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
+import com.raeden.ors_to_do.dependencies.storage.ProfileManager;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.modules.*;
@@ -23,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class TaskTrackerApp extends Application {
-    public static final String APP_VERSION = "v1.45";
+    public static final String APP_VERSION = "v1.465";
 
     private List<TaskItem> taskDatabase;
     private AppStats appStats;
@@ -44,6 +45,9 @@ public class TaskTrackerApp extends Application {
 
     @Override
     public void init() throws Exception {
+        // Point storage at the previously-active profile before any data is loaded.
+        ProfileManager.init();
+
         taskDatabase = StorageManager.loadTasks();
         appStats = StorageManager.loadStats();
 
@@ -139,6 +143,43 @@ public class TaskTrackerApp extends Application {
 
         rootLayout = new BorderPane();
 
+        // --- FIXED: Widened the base resolution of the app ---
+        Scene scene = new Scene(rootLayout, 1005, 700);
+
+        java.net.URL cssUrl = getClass().getResource("/styles.css");
+        if (cssUrl != null) {
+            scene.getStylesheets().add(cssUrl.toExternalForm());
+        }
+
+        // Register bundled fonts (Retro / Pixel Art / Matrix) and apply the user's chosen family.
+        com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.registerFonts();
+        com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(scene, appStats.getTaskFontFamily());
+
+        primaryStage.setTitle("Task-Tracker");
+        primaryStage.setAlwaysOnTop(appStats.isAlwaysOnTop());
+
+        try {
+            java.io.InputStream iconStream = getClass().getResourceAsStream("/icon.png");
+            if (iconStream != null) {
+                primaryStage.getIcons().add(new javafx.scene.image.Image(iconStream));
+            }
+        } catch (Exception e) {
+            System.out.println("Error loading window icon.");
+        }
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+        buildSession(primaryStage);
+        GlobalActivityTracker.init();
+    }
+
+    /**
+     * (Re)builds everything that is bound to the current {@code taskDatabase}/{@code appStats}: the
+     * sidebar, all modules, the global search, quick-capture hook, and notifications. Called once at
+     * startup and again whenever the active profile changes (so the new profile's data is shown).
+     */
+    private void buildSession(Stage stage) {
         Runnable syncUI = () -> {
             if (currentDynamicPanel != null) currentDynamicPanel.refreshList();
             if (focusHubPanel != null) focusHubPanel.refreshTasks();
@@ -146,6 +187,7 @@ public class TaskTrackerApp extends Application {
             if (sidebarManager != null) sidebarManager.refreshSidebar();
         };
 
+        if (quickCaptureManager != null) quickCaptureManager.unregister();
         quickCaptureManager = new QuickCaptureManager(appStats, taskDatabase, syncUI);
         quickCaptureManager.register();
 
@@ -163,38 +205,41 @@ public class TaskTrackerApp extends Application {
         focusHubPanel = new FocusHubModule(appStats, taskDatabase, syncUI);
         analyticsPanel = new AnalyticsModule(appStats, taskDatabase);
         archivedPanel = new ArchivedModule(taskDatabase, appStats, syncUI);
-        settingsPanel = new SettingsModule(appStats, taskDatabase, syncUI);
+        settingsPanel = new SettingsModule(appStats, taskDatabase, syncUI, this::switchProfile);
 
         rootLayout.setLeft(sidebarManager);
-
-        // --- FIXED: Widened the base resolution of the app ---
-        Scene scene = new Scene(rootLayout, 1005, 700);
-
-        java.net.URL cssUrl = getClass().getResource("/styles.css");
-        if (cssUrl != null) {
-            scene.getStylesheets().add(cssUrl.toExternalForm());
-        }
-
-        primaryStage.setTitle("Task-Tracker");
-        primaryStage.setAlwaysOnTop(appStats.isAlwaysOnTop());
-
-        try {
-            java.io.InputStream iconStream = getClass().getResourceAsStream("/icon.png");
-            if (iconStream != null) {
-                primaryStage.getIcons().add(new javafx.scene.image.Image(iconStream));
-            }
-        } catch (Exception e) {
-            System.out.println("Error loading window icon.");
-        }
-
-        primaryStage.setScene(scene);
-        primaryStage.show();
 
         if (!appStats.getSections().isEmpty()) navigateToModule(appStats.getSections().get(0).getId());
         else navigateToModule("SETTINGS");
 
-        NotificationManager.start(appStats, taskDatabase, primaryStage);
-        GlobalActivityTracker.init();
+        NotificationManager.start(appStats, taskDatabase, stage);
+    }
+
+    /**
+     * Switches to a different data profile: persists the current profile, repoints storage at the
+     * target profile's database, reloads its data, and rebuilds the whole UI session.
+     */
+    private void switchProfile(String newProfileId) {
+        if (newProfileId == null || newProfileId.equals(ProfileManager.getActiveId())) return;
+
+        // Persist the current profile before swapping databases.
+        DailyRolloverManager.autoArchiveTasks(appStats, taskDatabase);
+        StorageManager.saveTasks(taskDatabase);
+        StorageManager.saveStats(appStats);
+
+        // Repoint storage and reload the target profile's world.
+        ProfileManager.setActive(newProfileId);
+        taskDatabase = StorageManager.loadTasks();
+        appStats = StorageManager.loadStats();
+        runSilentDataMigration();
+        DailyRolloverManager.processDailyRollover(appStats, taskDatabase);
+
+        buildSession(MAIN_STAGE);
+
+        if (MAIN_STAGE.getScene() != null) {
+            com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(MAIN_STAGE.getScene(), appStats.getTaskFontFamily());
+        }
+        MAIN_STAGE.setAlwaysOnTop(appStats.isAlwaysOnTop());
     }
 
     private void shutdownApp() {

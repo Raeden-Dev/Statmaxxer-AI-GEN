@@ -62,6 +62,10 @@ public class GeneralSettingsPanel extends VBox {
         Spinner<Integer> fontSizeSpinner = new Spinner<>(10, 36, appStats.getTaskFontSize());
         fontSizeSpinner.setEditable(true);
 
+        ComboBox<String> fontFamilyBox = new ComboBox<>();
+        fontFamilyBox.getItems().addAll(com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.options());
+        fontFamilyBox.setValue(com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.normalize(appStats.getTaskFontFamily()));
+
         Slider streakSlider = new Slider(10, 100, appStats.getMinDailyCompletionPercent());
         streakSlider.setMajorTickUnit(10); streakSlider.setMinorTickCount(0); streakSlider.setSnapToTicks(true);
         streakSlider.setShowTickLabels(false); streakSlider.setShowTickMarks(false); streakSlider.setPrefWidth(120);
@@ -150,7 +154,7 @@ public class GeneralSettingsPanel extends VBox {
             confirmMenu.getItems().add(new SeparatorMenuItem());
 
             for (SectionConfig sc : appStats.getSections()) {
-                if (sc.isNotesPage() || sc.isRewardsPage() || sc.isStatPage() || sc.isPerkPage() || sc.isSeparator()) {
+                if (sc.isNotesPage() || sc.isRewardsPage() || sc.isStatPage() || sc.isPerkPage() || sc.isSeparator() || sc.isCalendarPage()) {
                     continue;
                 }
 
@@ -181,7 +185,7 @@ public class GeneralSettingsPanel extends VBox {
                     if (!selectedConfirm.contains("ALL")) selectedConfirm.add("ALL");
                     for (CheckBox cb : sectionCbs) cb.setSelected(true);
                     for (SectionConfig sc : appStats.getSections()) {
-                        if (sc.isNotesPage() || sc.isRewardsPage() || sc.isStatPage() || sc.isPerkPage() || sc.isSeparator()) {
+                        if (sc.isNotesPage() || sc.isRewardsPage() || sc.isStatPage() || sc.isPerkPage() || sc.isSeparator() || sc.isCalendarPage()) {
                             continue;
                         }
                         if (!selectedConfirm.contains(sc.getId())) selectedConfirm.add(sc.getId());
@@ -198,6 +202,7 @@ public class GeneralSettingsPanel extends VBox {
         confirmMenu.setOnShowing(e -> rebuildConfirmMenu.run());
 
         behaviorList.getChildren().addAll(
+                createSettingRow("Font Style", "Changes the font family used across the whole app. Includes Retro, Pixel Art, and Matrix styles.", fontFamilyBox, "#569CD6"),
                 createSettingRow("Task Font Size", "Adjusts the size of the text across all task cards.", fontSizeSpinner, "#569CD6"),
                 createSettingRow("Checkbox Theme", "Changes the visual style and color of the completion checkboxes.", themeBox, "#DCDCAA"),
                 createSettingRow("Zen Mode", "Number of active tasks required before Zen Mode becomes available.", zenSpinner, "#FF6666"),
@@ -251,6 +256,7 @@ public class GeneralSettingsPanel extends VBox {
 
         Runnable autoSaveTrigger = () -> {
             appStats.setTaskFontSize(fontSizeSpinner.getValue());
+            appStats.setTaskFontFamily(fontFamilyBox.getValue());
             appStats.setMinDailyCompletionPercent((int) streakSlider.getValue());
             appStats.setRunInBackground(runInBackgroundCheck.isSelected());
             appStats.setRunOnStartup(chkStartup.isSelected());
@@ -284,6 +290,10 @@ public class GeneralSettingsPanel extends VBox {
         };
 
         fontSizeSpinner.valueProperty().addListener((obs, oldVal, newVal) -> autoSaveTrigger.run());
+        fontFamilyBox.setOnAction(e -> {
+            autoSaveTrigger.run();
+            com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(getScene(), fontFamilyBox.getValue());
+        });
         zenSpinner.valueProperty().addListener((obs, oldVal, newVal) -> autoSaveTrigger.run());
         streakSlider.valueChangingProperty().addListener((obs, wasChanging, isChanging) -> { if (!isChanging) autoSaveTrigger.run(); });
         streakSlider.setOnMouseReleased(e -> autoSaveTrigger.run());

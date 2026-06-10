@@ -38,8 +38,15 @@ public class TaskCardStyleHelper {
             bgStyle = isLocked ? "-fx-background-color: derive(#332B00, -60%); " : "-fx-background-color: #332B00; ";
             borderStyle = "-fx-border-color: " + (isLocked ? "derive(#FFD700, -60%)" : "#FFD700") + "; -fx-border-width: 1; -fx-border-radius: 4; ";
         } else if (task.isLinkCard()) {
-            bgStyle = isLocked ? "-fx-background-color: derive(#1A3A4D, -60%); " : "-fx-background-color: #1A3A4D; ";
-            borderStyle = "-fx-border-color: " + (isLocked ? "derive(#569CD6, -60%)" : "#569CD6") + "; -fx-border-width: 1; -fx-border-radius: 4; ";
+            // Link cards default to the classic blue look, but honour any custom background /
+            // outline colour the user picks in the edit dialog (same as ordinary cards). This lets
+            // link cards be themed instead of being permanently locked to blue.
+            String linkBg = (task.getColorHex() != null && !task.getColorHex().equals("transparent"))
+                    ? task.getColorHex() : "#1A3A4D";
+            String linkOutline = (task.getCustomOutlineColor() != null && !task.getCustomOutlineColor().equals("transparent"))
+                    ? task.getCustomOutlineColor() : "#569CD6";
+            bgStyle = isLocked ? "-fx-background-color: derive(" + linkBg + ", -60%); " : "-fx-background-color: " + linkBg + "; ";
+            borderStyle = "-fx-border-color: " + (isLocked ? "derive(" + linkOutline + ", -60%)" : linkOutline) + "; -fx-border-width: 1; -fx-border-radius: 4; ";
         } else if (allowStyling && task.getCustomOutlineColor() != null && !task.getCustomOutlineColor().equals("transparent")) {
             borderStyle = "-fx-border-color: " + (isLocked ? "derive(" + task.getCustomOutlineColor() + ", -60%)" : task.getCustomOutlineColor()) + "; -fx-border-width: 1; -fx-border-radius: 4; ";
         } else if (!isLocked) {

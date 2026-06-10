@@ -65,26 +65,31 @@ public class TemplateManagerPanel extends VBox {
     public void refreshSectionSelector() {
         SectionConfig current = sectionBox.getValue();
         setupSectionBox();
+        // Preserve the current selection if it still exists; otherwise default to "(Hide)" (null)
+        // so the panel reopens collapsed rather than auto-expanding a section's template list.
         if (current != null && sectionBox.getItems().contains(current)) sectionBox.setValue(current);
-        else if (!sectionBox.getItems().isEmpty()) sectionBox.setValue(sectionBox.getItems().get(0));
+        else sectionBox.setValue(null);
         refreshList();
     }
 
     private void setupSectionBox() {
         sectionBox.getItems().clear();
+        // "(Hide)" sentinel (null) lets the user collapse this panel so it isn't cramped with a
+        // long list of templates from a previously-selected section.
+        sectionBox.getItems().add(null);
         for (SectionConfig config : appStats.getSections()) {
             if (config.getResetIntervalHours() > 0) sectionBox.getItems().add(config);
         }
         sectionBox.setCellFactory(lv -> new ListCell<>() {
             @Override protected void updateItem(SectionConfig item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName());
+                setText(empty ? null : (item == null ? "(Hide)" : item.getName()));
             }
         });
         sectionBox.setButtonCell(new ListCell<>() {
             @Override protected void updateItem(SectionConfig item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName());
+                setText(empty ? null : (item == null ? "(Hide)" : item.getName()));
             }
         });
     }
@@ -93,7 +98,8 @@ public class TemplateManagerPanel extends VBox {
         templateList.getChildren().clear();
         SectionConfig selected = sectionBox.getValue();
 
-        if (selected == null) { templateList.getChildren().add(new Label("No auto-reset sections available.")); return; }
+        // "(Hide)" / nothing selected → keep the panel collapsed (empty) so it doesn't take space.
+        if (selected == null) { return; }
         if (selected.getAutoAddTemplates().isEmpty()) { templateList.getChildren().add(new Label("No templates for this section.")); return; }
 
         List<DailyTemplate> templates = selected.getAutoAddTemplates();
