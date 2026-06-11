@@ -497,12 +497,13 @@ public class CalendarPage extends BorderPane {
     private void applyRewards(CalendarTask task, boolean gained) {
         if (!config.isCalendarGrantsXp()) return;
 
-        // Stat XP (multiple stats) — reversible.
+        // Stat XP (multiple stats) — reversible. Routes through the EXP pool when enabled.
         for (var entry : task.getStatRewards().entrySet()) {
             for (CustomStat stat : appStats.getCustomStats()) {
                 if (stat.getId().equals(entry.getKey())) {
-                    int delta = gained ? entry.getValue() : -entry.getValue();
-                    stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() + delta));
+                    int cap = stat.getEffectiveMaxCap(appStats.getActiveDebuffs());
+                    if (gained) stat.gain(entry.getValue(), cap);
+                    else stat.drain(entry.getValue(), cap);
                     break;
                 }
             }

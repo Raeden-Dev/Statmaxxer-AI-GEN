@@ -28,6 +28,17 @@ All notable changes to the project are recorded here, newest first. Dates use IS
     (shown with a small "event" tag) per day as you like. In Task+Journal mode a day keeps a single
     note. All entries are included in the HTML export.
 
+### Added (stats)
+- **Per-stat EXP leveling** — each stat can opt into an EXP economy (toggle + *EXP per Level* +
+  *Current EXP* in its settings). Rewards/costs/penalties now feed an EXP pool instead of moving the
+  value directly, so points can't be trivially farmed. Filling the bar grants a stat point (carrying
+  the remainder toward the next level); a big reward can grant several at once. Penalties/costs drain
+  EXP and, on crossing 0, remove points (carrying the deficit down). At max cap the bar stays full;
+  at 0 points EXP is floored. Atrophy drains a level's worth of EXP for EXP stats. Stats left with
+  EXP off behave exactly as before.
+  - **EXP bar on the Stat page** with level + current/required EXP. A global **Show Stat EXP Bars**
+    setting sets the default; each stat card has a chevron to override it.
+
 ### Added (app)
 - **First-launch Setup Wizard** — on a brand-new install, a guided setup covers profile/display
   name, starter sections, appearance (theme + font), and personal/behavior preferences. Runs once.

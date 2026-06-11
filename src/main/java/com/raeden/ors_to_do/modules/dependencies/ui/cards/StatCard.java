@@ -2,6 +2,7 @@ package com.raeden.ors_to_do.modules.dependencies.ui.cards;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.CustomStat;
+import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -69,8 +70,49 @@ public class StatCard extends VBox {
         Label maxLabel = new Label(effectiveMax > 0 ? "/ " + effectiveMax : "");
         maxLabel.setStyle("-fx-text-fill: #858585; -fx-font-size: 12px; -fx-padding: 3 0 0 0;");
 
+        // 6b. EXP toggle chevron (only for EXP-enabled stats)
+        boolean barVisible = stat.isUseExp() && stat.isExpBarVisible(appStats.isShowStatExpBars());
+        if (stat.isUseExp()) {
+            Button chevron = new Button(barVisible ? "▾" : "▸");
+            chevron.setStyle("-fx-background-color: transparent; -fx-text-fill: " + txtColor + "; -fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 0 4;");
+            Tooltip.install(chevron, new Tooltip(com.raeden.ors_to_do.i18n.Lang.STAT_EXP_BAR_TOOLTIP.get()));
+            chevron.setOnAction(e -> {
+                stat.toggleExpBar(appStats.isShowStatExpBars());
+                StorageManager.saveStats(appStats);
+                if (onUpdate != null) onUpdate.run();
+            });
+            mainRow.getChildren().add(chevron);
+        }
+
         mainRow.getChildren().addAll(helpBtn, amountLabel, maxLabel);
         getChildren().add(mainRow);
+
+        // EXP progress bar (Stat page) — rendered as a small card: dark-gray fill, rounded edges,
+        // a bright outline matching the stat colour, and the level/EXP text wrapped inside it.
+        if (barVisible) {
+            int per = stat.getExpPerLevel();
+            int cur = Math.max(0, Math.min(stat.getCurrentExp(), per));
+            double frac = per > 0 ? (double) cur / per : 0.0;
+
+            ProgressBar bar = new ProgressBar(frac);
+            bar.setMaxWidth(Double.MAX_VALUE);
+            bar.setPrefHeight(7);
+            String pbCss = ".progress-bar { -fx-accent: " + txtColor + "; } " +
+                    ".progress-bar > .track { -fx-background-color: #1E1E1E; -fx-background-radius: 5; -fx-border-color: " + txtColor + "33; -fx-border-radius: 5; } " +
+                    ".progress-bar > .bar { -fx-background-radius: 5; -fx-background-insets: 1; }";
+            bar.getStylesheets().add("data:text/css;base64," + java.util.Base64.getEncoder().encodeToString(pbCss.getBytes()));
+
+            Label expLabel = new Label(com.raeden.ors_to_do.i18n.Lang.STAT_EXP_BAR_LABEL.get(stat.getCurrentAmount(), stat.getCurrentExp(), per));
+            expLabel.setStyle("-fx-text-fill: #DDDDDD; -fx-font-size: 10px; -fx-font-weight: bold;");
+
+            // Same width as the stat card row above (no side margins), just a compact box.
+            VBox expBox = new VBox(4, bar, expLabel);
+            expBox.setPadding(new Insets(6, 10, 6, 10));
+            expBox.setStyle("-fx-background-color: #2A2A2A; -fx-background-radius: 5; -fx-background-insets: 0; "
+                    + "-fx-border-color: " + txtColor + "; -fx-border-width: 1; -fx-border-radius: 5;");
+            VBox.setMargin(expBox, new Insets(3, 0, 0, 0));
+            getChildren().add(expBox);
+        }
 
         // Subtle hover effect
         mainRow.setOnMouseEntered(e -> mainRow.setStyle(hoverStyle));

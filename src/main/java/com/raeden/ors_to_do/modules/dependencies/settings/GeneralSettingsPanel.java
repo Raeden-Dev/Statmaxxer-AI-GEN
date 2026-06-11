@@ -118,6 +118,9 @@ public class GeneralSettingsPanel extends VBox {
         CheckBox chkExpandedStats = new CheckBox();
         chkExpandedStats.setSelected(appStats.isExpandStatMiniCards());
 
+        CheckBox chkShowExpBars = new CheckBox();
+        chkShowExpBars.setSelected(appStats.isShowStatExpBars());
+
         CheckBox chkTextToTask = new CheckBox();
         chkTextToTask.setSelected(appStats.isEnableTextToTask());
 
@@ -221,7 +224,8 @@ public class GeneralSettingsPanel extends VBox {
                 createSettingRow("Show Sidebar Active Count", "Displays the number of unfinished tasks directly on the sidebar buttons.", chkSidebarCount, "#C586C0"),
                 createSettingRow("Retractable Sidebar Separators", "Lets sidebar separators be clicked to hide/show the section buttons below them. When turned off, every separator is immediately collapsed and click/hover is disabled.", chkSidebarRetract, "#569CD6"),
                 createSettingRow("Enable Custom Stats", "Turns on the RPG points system across the entire application and tracks them in Analytics.", chkGlobalStats, "#B5CEA8"),
-                createSettingRow("Expanded Stats Info", "Shows the full stat name, category (Reward/Cost/Penalty), and custom colors on task cards instead of compact icons.", chkExpandedStats, "#B5CEA8")
+                createSettingRow("Expanded Stats Info", "Shows the full stat name, category (Reward/Cost/Penalty), and custom colors on task cards instead of compact icons.", chkExpandedStats, "#B5CEA8"),
+                createSettingRow(com.raeden.ors_to_do.i18n.Lang.SET_SHOW_EXP_BARS_TITLE.get(), com.raeden.ors_to_do.i18n.Lang.SET_SHOW_EXP_BARS_DESC.get(), chkShowExpBars, "#B5CEA8")
         );
 
         Label navHeader = new Label("Static Sidebar Texts & Colors");
@@ -273,6 +277,7 @@ public class GeneralSettingsPanel extends VBox {
             appStats.setCheckboxTheme(themeBox.getValue());
             appStats.setFocusInactivityThreshold(inactivitySpinner.getValue());
             appStats.setExpandStatMiniCards(chkExpandedStats.isSelected());
+            appStats.setShowStatExpBars(chkShowExpBars.isSelected());
 
             WindowsStartupManager.setStartupEnabled(chkStartup.isSelected());
 
@@ -305,17 +310,13 @@ public class GeneralSettingsPanel extends VBox {
         matchTitleColorCheck.setOnAction(e -> autoSaveTrigger.run());
         chkGlobalStats.setOnAction(e -> autoSaveTrigger.run());
         chkExpandedStats.setOnAction(e -> autoSaveTrigger.run());
+        chkShowExpBars.setOnAction(e -> autoSaveTrigger.run());
         chkTextToTask.setOnAction(e -> autoSaveTrigger.run());
         chkSidebarCount.setOnAction(e -> autoSaveTrigger.run());
         chkSidebarRetract.setOnAction(e -> {
-            // When the user disables the toggle, instantly collapse every separator so the
-            // sidebar drops into compact (label-only) mode. The autoSave below then writes the
-            // new flag + the freshly collapsed state in one shot.
-            if (!chkSidebarRetract.isSelected()) {
-                for (SectionConfig sc : appStats.getSections()) {
-                    if (sc.isSeparator()) appStats.setSeparatorCollapsed(sc.getId(), true);
-                }
-            }
+            // Disabling the toggle turns separators into static dividers with every section button
+            // visible — we no longer force-collapse them (that hid all sections). Per-separator
+            // collapse state is preserved so re-enabling restores the previous layout.
             autoSaveTrigger.run();
         });
         themeBox.setOnAction(e -> autoSaveTrigger.run());

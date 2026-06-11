@@ -179,9 +179,37 @@ public class StatsManagerPanel extends VBox {
         Spinner<Integer> startingAmountSpinner = new Spinner<>(0, 999999999, isNew ? 0 : stat.getCurrentAmount());
         startingAmountSpinner.setEditable(true);
         startingAmountSpinner.setMaxWidth(Double.MAX_VALUE);
-        Label startingAmountLabel = new Label("Current XP / \nStarting Amount:");
+        Label startingAmountLabel = new Label(com.raeden.ors_to_do.i18n.Lang.STAT_CURRENT_LEVEL.get());
         grid.add(startingAmountLabel, 0, rowIdx);
         grid.add(startingAmountSpinner, 1, rowIdx++);
+
+        // --- EXP leveling (opt-in) ---
+        CheckBox useExpCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.STAT_USE_EXP.get());
+        useExpCheck.setSelected(!isNew && stat.isUseExp());
+        useExpCheck.setStyle("-fx-text-fill: white;");
+        Tooltip.install(useExpCheck, new Tooltip(com.raeden.ors_to_do.i18n.Lang.STAT_EXP_TOOLTIP.get()));
+        grid.add(new Label("EXP System:"), 0, rowIdx);
+        grid.add(useExpCheck, 1, rowIdx++);
+
+        Spinner<Integer> expPerLevelSpinner = new Spinner<>(1, 999999999, !isNew && stat.getExpPerLevel() > 0 ? stat.getExpPerLevel() : 100);
+        expPerLevelSpinner.setEditable(true);
+        expPerLevelSpinner.setMaxWidth(Double.MAX_VALUE);
+        grid.add(new Label(com.raeden.ors_to_do.i18n.Lang.STAT_EXP_PER_LEVEL.get()), 0, rowIdx);
+        grid.add(expPerLevelSpinner, 1, rowIdx++);
+
+        Spinner<Integer> currentExpSpinner = new Spinner<>(0, 999999999, isNew ? 0 : stat.getCurrentExp());
+        currentExpSpinner.setEditable(true);
+        currentExpSpinner.setMaxWidth(Double.MAX_VALUE);
+        grid.add(new Label("Current EXP:"), 0, rowIdx);
+        grid.add(currentExpSpinner, 1, rowIdx++);
+
+        Runnable syncExpEnable = () -> {
+            boolean on = useExpCheck.isSelected();
+            expPerLevelSpinner.setDisable(!on);
+            currentExpSpinner.setDisable(!on);
+        };
+        syncExpEnable.run();
+        useExpCheck.setOnAction(e -> syncExpEnable.run());
 
         ComboBox<String> iconBox = new ComboBox<>();
         iconBox.getItems().addAll(TaskDialogs.ICON_LIST);
@@ -338,6 +366,10 @@ public class StatsManagerPanel extends VBox {
 
                 int startingAmt = startingAmountSpinner.getValue();
                 target.setCurrentAmount(startingAmt);
+
+                target.setUseExp(useExpCheck.isSelected());
+                target.setExpPerLevel(expPerLevelSpinner.getValue());
+                target.setCurrentExp(currentExpSpinner.getValue());
 
                 if (isNew) {
                     target.setLifetimeEarned(startingAmt);

@@ -85,10 +85,10 @@ public class SidebarManager extends BorderPane {
         for (SectionConfig config : appStats.getSections()) {
 
             if (config.isSeparator()) {
-                // When retractability is off, every separator is forced into the collapsed state
-                // (the toggle's on→off action already persists this; we re-honour it here so a
-                // freshly toggled session looks right without an extra refresh).
-                currentSeparatorCollapsed = !retractableEnabled || appStats.isSeparatorCollapsed(config.getId());
+                // When retractability is off, separators become plain static dividers and never hide
+                // their sections — every section button stays visible. Only when the feature is on
+                // do we honour each separator's persisted collapse state.
+                currentSeparatorCollapsed = retractableEnabled && appStats.isSeparatorCollapsed(config.getId());
                 dynamicSectionsBox.getChildren().add(buildSeparatorRow(config, currentSeparatorCollapsed, retractableEnabled));
                 continue;
             }

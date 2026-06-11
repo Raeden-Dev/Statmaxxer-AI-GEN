@@ -397,7 +397,7 @@ public class PomodoroTimer extends VBox {
                         for (Map.Entry<String, Integer> entry : appStats.getFocusStatRewards().entrySet()) {
                             CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
                             if (stat != null) {
-                                stat.setCurrentAmount(stat.getCurrentAmount() + entry.getValue());
+                                stat.gain(entry.getValue(), stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
                                 stat.setLifetimeEarned(stat.getLifetimeEarned() + entry.getValue());
                                 earnedRewards = true;
                             }

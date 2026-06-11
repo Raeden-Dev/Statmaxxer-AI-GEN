@@ -25,6 +25,17 @@ public class CustomStat implements Serializable {
     private int lifetimeLost = 0;
     private int maxLevelReached = 0;
 
+    // --- EXP leveling (opt-in per stat) -----------------------------------------------------
+    // When enabled, rewards/costs/penalties feed an EXP pool instead of changing the point value
+    // directly. Crossing {@code expPerLevel} upward grants a stat point (carrying the remainder);
+    // dropping below 0 removes a point (carrying the deficit down). At max cap the bar stays full;
+    // at 0 points EXP can't go negative.
+    private boolean useExp = false;
+    private int expPerLevel = 100;
+    private int currentExp = 0;
+    /** Per-card EXP-bar visibility override on the Stat page. null = follow the global default. */
+    private Boolean expBarExpanded = null;
+
     private List<StatThreshold> thresholds = new ArrayList<>();
 
     public CustomStat() {
@@ -85,4 +96,82 @@ public class CustomStat implements Serializable {
         return thresholds;
     }
     public void setThresholds(List<StatThreshold> thresholds) { this.thresholds = thresholds; }
+
+    // --- EXP leveling accessors -------------------------------------------------------------
+    public boolean isUseExp() { return useExp; }
+    public void setUseExp(boolean useExp) { this.useExp = useExp; }
+    public int getExpPerLevel() { return expPerLevel <= 0 ? 100 : expPerLevel; }
+    public void setExpPerLevel(int expPerLevel) { this.expPerLevel = expPerLevel; }
+    public int getCurrentExp() { return currentExp; }
+    public void setCurrentExp(int currentExp) { this.currentExp = currentExp; }
+
+    public Boolean getExpBarExpanded() { return expBarExpanded; }
+    public void setExpBarExpanded(Boolean expBarExpanded) { this.expBarExpanded = expBarExpanded; }
+    /** Effective EXP-bar visibility given the global default. */
+    public boolean isExpBarVisible(boolean globalDefault) {
+        return expBarExpanded != null ? expBarExpanded : globalDefault;
+    }
+    /** Flips this stat's bar relative to its current effective visibility. */
+    public void toggleExpBar(boolean globalDefault) {
+        expBarExpanded = !isExpBarVisible(globalDefault);
+    }
+
+    /**
+     * Applies an EXP {@code delta}, leveling the point value ({@link #currentAmount}) up or down
+     * with carry-over across multiple levels. Respects bounds: at {@code effectiveCap} the bar
+     * stays full and surplus is discarded; at 0 points EXP is floored at 0.
+     *
+     * @param effectiveCap the debuff-adjusted point ceiling (0 = infinite)
+     * @return the net change in stat points
+     */
+    public int addExp(int delta, int effectiveCap) {
+        int per = getExpPerLevel();
+        int startAmount = currentAmount;
+        currentExp += delta;
+
+        while (currentExp >= per) {
+            if (effectiveCap > 0 && currentAmount >= effectiveCap) {
+                currentExp = per; // capped: bar stays full
+                break;
+            }
+            currentExp -= per;
+            currentAmount++;
+        }
+        while (currentExp < 0) {
+            if (currentAmount <= 0) {
+                currentExp = 0; // floored: no negative EXP at zero points
+                break;
+            }
+            currentAmount--;
+            currentExp += per;
+        }
+
+        if (effectiveCap > 0 && currentAmount > effectiveCap) currentAmount = effectiveCap;
+        if (currentAmount < 0) currentAmount = 0;
+        if (currentAmount > maxLevelReached) maxLevelReached = currentAmount;
+        return currentAmount - startAmount;
+    }
+
+    /**
+     * Adds {@code amount} to this stat — through the EXP pool when EXP leveling is on, otherwise
+     * directly to the point value (clamped to {@code effectiveCap}).
+     */
+    public void gain(int amount, int effectiveCap) {
+        if (amount <= 0) return;
+        if (useExp) {
+            addExp(amount, effectiveCap);
+        } else {
+            int n = currentAmount + amount;
+            if (effectiveCap > 0 && n > effectiveCap) n = effectiveCap;
+            currentAmount = n;
+            if (currentAmount > maxLevelReached) maxLevelReached = currentAmount;
+        }
+    }
+
+    /** Subtracts {@code amount} — through EXP when enabled, otherwise directly (floored at 0). */
+    public void drain(int amount, int effectiveCap) {
+        if (amount <= 0) return;
+        if (useExp) addExp(-amount, effectiveCap);
+        else currentAmount = Math.max(0, currentAmount - amount);
+    }
 }

@@ -189,9 +189,18 @@ public class DailyRolloverManager {
                 // Catch up on missed atrophy windows in one pass — previously this only ever ticked
                 // a stat down by 1 even after a 10-day absence.
                 boolean fired = false;
+                int atrophyCap = stat.getEffectiveMaxCap(appStats.getActiveDebuffs());
                 while (daysSinceGain >= stat.getAtrophyDays() && stat.getCurrentAmount() > 0) {
-                    stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - 1));
-                    stat.setLifetimeLost(stat.getLifetimeLost() + 1);
+                    // For EXP stats, atrophy drains one level's worth of EXP (de-levels with carry);
+                    // otherwise it removes a single point, as before.
+                    if (stat.isUseExp()) {
+                        int before = stat.getCurrentAmount();
+                        stat.drain(stat.getExpPerLevel(), atrophyCap);
+                        stat.setLifetimeLost(stat.getLifetimeLost() + (before - stat.getCurrentAmount()));
+                    } else {
+                        stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - 1));
+                        stat.setLifetimeLost(stat.getLifetimeLost() + 1);
+                    }
                     statsChanged = true;
                     fired = true;
                     lastGain = lastGain.plusDays(stat.getAtrophyDays());

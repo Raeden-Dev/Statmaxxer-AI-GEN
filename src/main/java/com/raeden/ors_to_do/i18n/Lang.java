@@ -300,6 +300,18 @@ public enum Lang {
     LOADING_SWITCHING_PROFILE("Switching profile…"),
 
     // ---------------------------------------------------------------------
+    // Stats — EXP leveling
+    // ---------------------------------------------------------------------
+    STAT_USE_EXP("Use EXP Leveling"),
+    STAT_EXP_PER_LEVEL("EXP per Level:"),
+    STAT_CURRENT_LEVEL("Current Level / \nStarting Amount:"),
+    STAT_EXP_TOOLTIP("Rewards/penalties feed an EXP pool instead of changing the stat value directly.\nFilling the bar grants a point; dropping below 0 removes one (carrying the remainder)."),
+    STAT_EXP_BAR_TOOLTIP("Show / hide the EXP bar"),
+    STAT_EXP_BAR_LABEL("Lv {0}  ·  {1} / {2} EXP"),
+    SET_SHOW_EXP_BARS_TITLE("Show Stat EXP Bars"),
+    SET_SHOW_EXP_BARS_DESC("Default visibility of EXP progress bars on the Stat page for stats using EXP leveling. Each stat card can override this."),
+
+    // ---------------------------------------------------------------------
     // Misc / generic
     // ---------------------------------------------------------------------
     NOTIFY_DEBUFF_CLEANSED_TITLE("Debuff Cleansed!"),

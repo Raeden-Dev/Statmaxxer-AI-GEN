@@ -280,7 +280,7 @@ public class TaskActionHandler {
             for (CustomStat stat : appStats.getCustomStats()) {
                 int pen = getStatValue(task.getStatPenalties(), stat);
                 if (pen > 0) {
-                    stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - pen));
+                    stat.drain(pen, stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
                     stat.setLifetimeLost(stat.getLifetimeLost() + pen);
                 }
             }
@@ -329,35 +329,26 @@ public class TaskActionHandler {
                 }
 
                 if (rewardAmt > 0) {
-                    int newAmount = stat.getCurrentAmount() + rewardAmt;
-                    if (stat.getMaxCap() > 0 && newAmount > effectiveCap) {
-                        newAmount = effectiveCap;
-                    }
-                    stat.setCurrentAmount(newAmount);
+                    // Routes through the EXP pool when EXP leveling is on; otherwise adds points
+                    // directly (clamped to the cap). gain() also tracks the peak level.
+                    stat.gain(rewardAmt, effectiveCap);
                     stat.setLifetimeEarned(stat.getLifetimeEarned() + rewardAmt);
-                    if (stat.getCurrentAmount() > stat.getMaxLevelReached()) {
-                        stat.setMaxLevelReached(stat.getCurrentAmount());
-                    }
                     appStats.getLastStatGainDates().put(stat.getId(), java.time.LocalDate.now());
                 }
 
                 if (costAmt > 0) {
-                    stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - costAmt));
+                    stat.drain(costAmt, effectiveCap);
                     stat.setLifetimeLost(stat.getLifetimeLost() + costAmt);
                 }
 
             } else {
                 if (rewardAmt > 0) {
-                    stat.setCurrentAmount(Math.max(0, stat.getCurrentAmount() - rewardAmt));
+                    stat.drain(rewardAmt, effectiveCap);
                     stat.setLifetimeLost(stat.getLifetimeLost() + rewardAmt);
                 }
 
                 if (costAmt > 0) {
-                    int newAmount = stat.getCurrentAmount() + costAmt;
-                    if (stat.getMaxCap() > 0 && newAmount > effectiveCap) {
-                        newAmount = effectiveCap;
-                    }
-                    stat.setCurrentAmount(newAmount);
+                    stat.gain(costAmt, effectiveCap);
                 }
 
                 if (capAmt > 0 && stat.getMaxCap() > 0) {
