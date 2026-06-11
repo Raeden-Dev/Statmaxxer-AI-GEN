@@ -2,6 +2,7 @@ package com.raeden.ors_to_do.modules.dependencies.settings;
 
 import com.raeden.ors_to_do.dependencies.models.Profile;
 import com.raeden.ors_to_do.dependencies.storage.ProfileManager;
+import com.raeden.ors_to_do.i18n.Lang;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -32,7 +33,7 @@ public class ProfileManagerPanel extends VBox {
 
         Label header = new Label("Profiles");
         header.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #FFFFFF;");
-        Label desc = new Label("Each profile is a separate world with its own tasks, sections, and stats. The active profile is remembered the next time you launch.");
+        Label desc = new Label(Lang.PROFILE_DESC.get());
         desc.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
         desc.setWrapText(true);
 
@@ -72,16 +73,16 @@ public class ProfileManagerPanel extends VBox {
         for (Profile p : profileBox.getItems()) {
             if (p.getId().equals(activeId)) { profileBox.setValue(p); break; }
         }
-        activeLabel.setText("Active profile: " + ProfileManager.getActiveProfile().getName());
+        activeLabel.setText(Lang.PROFILE_ACTIVE_LABEL.get(ProfileManager.getActiveProfile().getName()));
     }
 
     private void doSwitch() {
         Profile sel = profileBox.getValue();
         if (sel == null || sel.getId().equals(ProfileManager.getActiveId())) return;
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                "Switch to profile \"" + sel.getName() + "\"? Your current profile is saved automatically.",
+                Lang.PROFILE_SWITCH_BODY.get(sel.getName()),
                 ButtonType.OK, ButtonType.CANCEL);
-        confirm.setHeaderText("Switch Profile");
+        confirm.setHeaderText(Lang.PROFILE_SWITCH_HEADER.get());
         TaskDialogs.styleDialog(confirm);
         Optional<ButtonType> res = confirm.showAndWait();
         if (res.isPresent() && res.get() == ButtonType.OK && onSwitchProfile != null) {
@@ -90,9 +91,9 @@ public class ProfileManagerPanel extends VBox {
     }
 
     private void doNew() {
-        TextInputDialog d = new TextInputDialog("New Profile");
-        d.setTitle("New Profile");
-        d.setHeaderText("Name for the new profile:");
+        TextInputDialog d = new TextInputDialog(Lang.PROFILE_NEW_HEADER.get());
+        d.setTitle(Lang.PROFILE_NEW_HEADER.get());
+        d.setHeaderText(Lang.PROFILE_NEW_PROMPT.get());
         TaskDialogs.styleDialog(d);
         d.showAndWait().ifPresent(name -> {
             if (name.isBlank()) return;
@@ -100,9 +101,9 @@ public class ProfileManagerPanel extends VBox {
             refresh();
             // Offer to switch into the freshly created (empty) profile.
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                    "Profile \"" + created.getName() + "\" created. Switch to it now?",
+                    Lang.PROFILE_CREATED_SWITCH_BODY.get(created.getName()),
                     ButtonType.YES, ButtonType.NO);
-            confirm.setHeaderText("Switch to New Profile?");
+            confirm.setHeaderText(Lang.PROFILE_CREATED_SWITCH_HEADER.get());
             TaskDialogs.styleDialog(confirm);
             confirm.showAndWait().ifPresent(b -> {
                 if (b == ButtonType.YES && onSwitchProfile != null) onSwitchProfile.accept(created.getId());
@@ -114,8 +115,8 @@ public class ProfileManagerPanel extends VBox {
         Profile sel = profileBox.getValue();
         if (sel == null) return;
         TextInputDialog d = new TextInputDialog(sel.getName());
-        d.setTitle("Rename Profile");
-        d.setHeaderText("New name for \"" + sel.getName() + "\":");
+        d.setTitle(Lang.PROFILE_RENAME_HEADER.get());
+        d.setHeaderText(Lang.PROFILE_RENAME_PROMPT.get(sel.getName()));
         TaskDialogs.styleDialog(d);
         d.showAndWait().ifPresent(name -> {
             if (name.isBlank()) return;
@@ -128,22 +129,22 @@ public class ProfileManagerPanel extends VBox {
         Profile sel = profileBox.getValue();
         if (sel == null) return;
         if (ProfileManager.DEFAULT_ID.equals(sel.getId())) {
-            info("The Default profile cannot be deleted.");
+            info(Lang.PROFILE_CANT_DELETE_DEFAULT.get());
             return;
         }
         if (sel.getId().equals(ProfileManager.getActiveId())) {
-            info("You cannot delete the profile you are currently using. Switch to another profile first.");
+            info(Lang.PROFILE_CANT_DELETE_ACTIVE.get());
             return;
         }
         Alert confirm = new Alert(Alert.AlertType.WARNING,
-                "Permanently delete profile \"" + sel.getName() + "\" and all of its data? This cannot be undone.",
+                Lang.PROFILE_DELETE_BODY.get(sel.getName()),
                 ButtonType.OK, ButtonType.CANCEL);
-        confirm.setHeaderText("Delete Profile");
+        confirm.setHeaderText(Lang.PROFILE_DELETE_HEADER.get());
         TaskDialogs.styleDialog(confirm);
         confirm.showAndWait().ifPresent(b -> {
             if (b == ButtonType.OK) {
                 if (ProfileManager.deleteProfile(sel.getId())) refresh();
-                else info("This profile could not be deleted.");
+                else info(Lang.PROFILE_DELETE_FAILED.get());
             }
         });
     }

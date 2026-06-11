@@ -149,8 +149,8 @@ public class AnalyticsExporter {
 
             try { java.awt.Desktop.getDesktop().browse(exportFile.toURI()); } catch (Exception ignore) { }
 
-            Alert alert = new Alert(Alert.AlertType.INFORMATION, "Calendar analytics exported to Desktop:\n" + exportFile.getName());
-            alert.setHeaderText("Export Successful");
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, com.raeden.ors_to_do.i18n.Lang.CAL_EXPORT_DONE_BODY.get(exportFile.getName()));
+            alert.setHeaderText(com.raeden.ors_to_do.i18n.Lang.EXPORT_SUCCESS_HEADER.get());
             alert.show();
         } catch (Exception ex) {
             ex.printStackTrace();

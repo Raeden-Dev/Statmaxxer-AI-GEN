@@ -100,7 +100,7 @@ public class TemplateManagerPanel extends VBox {
 
         // "(Hide)" / nothing selected → keep the panel collapsed (empty) so it doesn't take space.
         if (selected == null) { return; }
-        if (selected.getAutoAddTemplates().isEmpty()) { templateList.getChildren().add(new Label("No templates for this section.")); return; }
+        if (selected.getAutoAddTemplates().isEmpty()) { templateList.getChildren().add(new Label(com.raeden.ors_to_do.i18n.Lang.TEMPLATE_NONE_FOR_SECTION.get())); return; }
 
         List<DailyTemplate> templates = selected.getAutoAddTemplates();
         for (int i = 0; i < templates.size(); i++) {

@@ -34,6 +34,24 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 - **Loading screen** — a brief branded loading view shows on app launch and when switching profiles
   so large data sets don't appear to freeze.
 
+### Changed (calendar polish)
+- **Journal/event cards** use a new row layout: entry-type tag (*event*/*log*) → icon → a colored
+  rectangle spanning the card's height (like note sideboxes) → text.
+- **Add Journal Entry / Add Event** buttons restyled to bright-outline-on-dark, matching the rest
+  of the app; the entry edit dialog's controls are now uniformly sized and dark-themed.
+- The day right-click menu starts with **Customize Day…** (day icon + color always; in Journal-Only
+  mode the day cell's background/outline are stylable like a card, with randomize). The separate
+  *Set/Change/Clear Day Icon* items were folded into it.
+- In **Journal-Only** mode the top-right filter no longer lists calendar tasks (only *Show All* and
+  *★ Favorites*), since the task system is hidden there.
+- **Edit Section compatibility engine:** toggles that can do nothing for the selected page type are
+  now disabled — Calendar/Stat pages grey out all task-feature toggles; Perk/Challenge pages grey
+  out dead switches (tags, score, stats, dates, favorites, icons, styling, archiving, locking);
+  Notes pages grey out completion-driven features; *Enable Sub-Task Links* requires *Enable
+  Sub-Tasks*.
+- New-feature UI text (calendar, journal, wizard, profiles, settings chrome) now routes through the
+  central `Lang`/`LangManager` i18n layer.
+
 ### Fixed
 - **Profile switching crash** — switching profiles no longer throws a
   `RejectedExecutionException` from the global hotkey hook (the JNativeHook dispatch pool is kept

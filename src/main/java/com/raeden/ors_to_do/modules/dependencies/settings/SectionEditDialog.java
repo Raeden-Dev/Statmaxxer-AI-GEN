@@ -110,17 +110,17 @@ public class SectionEditDialog {
         // when Calendar Page is selected; wired up after the master state engine below. ---
         VBox calendarOptionsBox = new VBox(8);
         calendarOptionsBox.setStyle("-fx-border-color: #C586C0; -fx-border-radius: 5; -fx-padding: 10; -fx-background-color: #2A2330; -fx-background-radius: 5;");
-        Label calHeader = new Label("Calendar Options:"); calHeader.setStyle("-fx-text-fill: #C586C0; -fx-font-weight: bold; -fx-font-size: 12px;");
-        CheckBox calSegmentsCheck = new CheckBox("Show Segments (color bands on the day)"); calSegmentsCheck.setSelected(config.isCalendarShowSegments()); calSegmentsCheck.setStyle("-fx-text-fill: white;");
-        CheckBox calDotsCheck = new CheckBox("Show Dots (color dots under the date)"); calDotsCheck.setSelected(config.isCalendarShowDots()); calDotsCheck.setStyle("-fx-text-fill: white;");
-        CheckBox calManipulationCheck = new CheckBox("Allow Calendar Manipulation (mark past/future days)"); calManipulationCheck.setSelected(config.isAllowCalendarManipulation()); calManipulationCheck.setStyle("-fx-text-fill: white;");
-        CheckBox calGrantXpCheck = new CheckBox("Grant rewards on completion (XP / score / debuffs / hooks)"); calGrantXpCheck.setSelected(config.isCalendarGrantsXp()); calGrantXpCheck.setStyle("-fx-text-fill: white;");
-        CheckBox calJournalCheck = new CheckBox("Enable Journal (write per-day notes)"); calJournalCheck.setSelected(config.isCalendarJournalEnabled()); calJournalCheck.setStyle("-fx-text-fill: white;");
-        CheckBox calJournalOnlyCheck = new CheckBox("Journal Only (notes replace the Task List)"); calJournalOnlyCheck.setSelected(config.isCalendarJournalOnly()); calJournalOnlyCheck.setStyle("-fx-text-fill: white;");
+        Label calHeader = new Label(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_OPTIONS_HEADER.get()); calHeader.setStyle("-fx-text-fill: #C586C0; -fx-font-weight: bold; -fx-font-size: 12px;");
+        CheckBox calSegmentsCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_SEGMENTS.get()); calSegmentsCheck.setSelected(config.isCalendarShowSegments()); calSegmentsCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calDotsCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_DOTS.get()); calDotsCheck.setSelected(config.isCalendarShowDots()); calDotsCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calManipulationCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_MANIPULATION.get()); calManipulationCheck.setSelected(config.isAllowCalendarManipulation()); calManipulationCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calGrantXpCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_GRANT.get()); calGrantXpCheck.setSelected(config.isCalendarGrantsXp()); calGrantXpCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calJournalCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_JOURNAL.get()); calJournalCheck.setSelected(config.isCalendarJournalEnabled()); calJournalCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calJournalOnlyCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_JOURNAL_ONLY.get()); calJournalOnlyCheck.setSelected(config.isCalendarJournalOnly()); calJournalOnlyCheck.setStyle("-fx-text-fill: white;");
         // Journal-only implies journal enabled; keep the two checkboxes consistent.
         calJournalOnlyCheck.selectedProperty().addListener((o, was, on) -> { if (on) calJournalCheck.setSelected(true); });
         calJournalCheck.selectedProperty().addListener((o, was, on) -> { if (!on) calJournalOnlyCheck.setSelected(false); });
-        Label calDesc = new Label("Define the calendar's tasks on the page itself. Mark a day done to color it; toggle which indicators show above. Right-click a day for journal / favorite / icon options.");
+        Label calDesc = new Label(com.raeden.ors_to_do.i18n.Lang.SEC_CAL_DESC.get());
         calDesc.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;"); calDesc.setWrapText(true);
         calendarOptionsBox.getChildren().addAll(calHeader, calSegmentsCheck, calDotsCheck, calManipulationCheck, calGrantXpCheck, calJournalCheck, calJournalOnlyCheck, calDesc);
         content.getChildren().add(calendarOptionsBox);
@@ -222,6 +222,40 @@ public class SectionEditDialog {
                 enableSubTasksCheck.setDisable(links); enableLinkCardsCheck.setDisable(subTasks || focus); trackTimeCheck.setDisable(links);
                 enableZenModeCheck.setDisable(false); showPriorityCheck.setDisable(false);
                 enableTimedTasksCheck.setDisable(false); allowRepeatingTasksCheck.setDisable(false);
+            }
+
+            // --- Page-type compatibility matrix ---------------------------------------
+            // Reset the matrix-managed toggles each pass, then disable whatever the selected
+            // page type can't use, so incompatible settings can't be left on silently.
+            CheckBox[] matrixToggles = { allowManualArchiveCheck, showDateCheck, showPrefixCheck, showTagsCheck,
+                    enableScoreCheck, enableLinksCheck, enableStatsSystemCheck, enableTaskStylingCheck,
+                    lockCompletedCheck, showTaskTypeCheck, favoriteCheck, showAnalyticsCheck,
+                    enableIconsCheck, enableCategoriesCheck };
+            for (CheckBox cb : matrixToggles) cb.setDisable(false);
+            preventEditingSpinner.setDisable(false);
+
+            java.util.function.Consumer<CheckBox> off = cb -> { cb.setDisable(true); cb.setSelected(false); };
+
+            if (isCalendar || isStat) {
+                // Calendar and Stat pages render no task cards — every task feature is inert.
+                for (CheckBox cb : matrixToggles) off.accept(cb);
+                preventEditingSpinner.setDisable(true);
+                if (preventEditingSpinner.getValue() != 0) preventEditingSpinner.getValueFactory().setValue(0);
+            } else if (isPerk || isChallenge) {
+                // Perk/Challenge cards configure icons, colours and rewards in their own dialogs,
+                // never render tag pills / creation dates / favorites, and lock themselves on
+                // completion — so those section toggles would be dead switches here.
+                off.accept(showTagsCheck); off.accept(enableScoreCheck); off.accept(enableStatsSystemCheck);
+                off.accept(showDateCheck); off.accept(favoriteCheck); off.accept(enableIconsCheck);
+                off.accept(enableTaskStylingCheck); off.accept(allowManualArchiveCheck);
+                off.accept(lockCompletedCheck); off.accept(showTaskTypeCheck); off.accept(enableLinksCheck);
+            } else if (isNotes) {
+                // Notes never complete, so completion-driven features have nothing to act on.
+                off.accept(enableScoreCheck); off.accept(enableStatsSystemCheck);
+                off.accept(showTaskTypeCheck); off.accept(lockCompletedCheck); off.accept(enableLinksCheck);
+            } else if (!enableSubTasksCheck.isSelected()) {
+                // Regular / rewards pages: sub-task links require sub-tasks to exist.
+                off.accept(enableLinksCheck);
             }
 
             streakCheck.setDisable(!hasInterval); if (!hasInterval) streakCheck.setSelected(false);

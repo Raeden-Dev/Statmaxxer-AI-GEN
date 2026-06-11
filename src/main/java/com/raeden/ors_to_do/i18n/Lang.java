@@ -180,6 +180,126 @@ public enum Lang {
     HELP_HEADER("How to use the application: ({0})"),
 
     // ---------------------------------------------------------------------
+    // Calendar Page
+    // ---------------------------------------------------------------------
+    CAL_FILTER_SHOW_ALL("Show All"),
+    CAL_FILTER_FAVORITES("★ Favorites"),
+    CAL_TASK_LIST_TITLE("Task List"),
+    CAL_JOURNAL_TITLE("Journal"),
+    CAL_JOURNAL_DAY_TITLE("Journal — {0}"),
+    CAL_BTN_ADD_TASK("＋ Add Task"),
+    CAL_BTN_ADD_JOURNAL("＋ Add Journal Entry"),
+    CAL_BTN_ADD_EVENT("＋ Add Event"),
+    CAL_HINT_SELECT_TASK("Select a task card below first, then click a day to mark it."),
+    CAL_HINT_TODAY_ONLY("This calendar only allows marking today. Enable \"Allow Calendar Manipulation\" in Edit Section to change other days."),
+    CAL_HINT_MARKING_WITH("Marking with \"{0}\" — click a day above."),
+    CAL_JOURNAL_CLICK_DAY_HINT("Click a day above to view, add, or edit its journal entries and events."),
+    CAL_NO_ENTRIES_FOR_DAY("No entries for this day yet. Add a journal entry or an event."),
+    CAL_MENU_VIEW_ADD_ENTRIES("View / Add Entries"),
+    CAL_MENU_ADD_JOURNAL("Add Journal Entry…"),
+    CAL_MENU_ADD_EVENT("Add Event…"),
+    CAL_MENU_EDIT_JOURNAL("Edit Journal Entry"),
+    CAL_MENU_CUSTOMIZE_DAY("Customize Day…"),
+    CAL_MENU_FAVORITE_DAY("Favorite Day"),
+    CAL_MENU_UNFAVORITE_DAY("Unfavorite Day"),
+    CAL_MENU_CLEAR_MARKS("Clear Day Marks"),
+    CAL_MENU_EDIT_TASK("Edit Task"),
+    CAL_MENU_REMOVE_TASK("Permanently Remove Task"),
+    CAL_TOOLTIP_CONFIGURE_TASK("Configure / edit this task"),
+    CAL_TOOLTIP_CUSTOMIZE_EDIT("Customize / edit"),
+    CAL_DLG_ADD_TASK("Add Calendar Task"),
+    CAL_DLG_EDIT_TASK("Edit Calendar Task"),
+    CAL_DLG_ADD_JOURNAL("Add Journal Entry"),
+    CAL_DLG_EDIT_JOURNAL("Edit Journal Entry"),
+    CAL_DLG_ADD_EVENT("Add Event"),
+    CAL_DLG_EDIT_EVENT("Edit Event"),
+    CAL_DLG_CUSTOMIZE_DAY("Customize Day — {0}"),
+    CAL_PROMPT_TASK_NAME("e.g. Gym, 8 Hour Work"),
+    CAL_PROMPT_SCORE("+ Global score points"),
+    CAL_REWARDS_HEADER("Rewards on completion"),
+    CAL_REWARDS_DISABLED_NOTE("Note: enable \"Grant rewards on completion\" in Edit Section for these to apply."),
+    CAL_STAT_REWARDS_HEADER("Stat Rewards"),
+    CAL_LBL_SCORE_REWARD("Score Reward:"),
+    CAL_LBL_INFLICT_DEBUFFS("Inflict Debuffs:"),
+    CAL_LBL_HOOK_CARDS("Hook Cards:"),
+    CAL_HOOK_DESC("Completing this calendar task will complete hooked cards and +1 to hooked counter/repeating cards."),
+    CAL_DEBUFF_SELECT("Select Debuffs to Inflict"),
+    CAL_DEBUFF_COUNT("Debuffs to Inflict ({0})"),
+    CAL_ENTRY_TAG_EVENT("event"),
+    CAL_ENTRY_TAG_LOG("log"),
+    CAL_MENU_EDIT_ENTRY("Edit Entry"),
+    CAL_MENU_DELETE_ENTRY("Delete Entry"),
+    CAL_EXPORT_DONE_BODY("Calendar analytics exported to Desktop:\n{0}"),
+    EXPORT_SUCCESS_HEADER("Export Successful"),
+
+    // ---------------------------------------------------------------------
+    // Edit Section — calendar options
+    // ---------------------------------------------------------------------
+    SEC_CAL_OPTIONS_HEADER("Calendar Options:"),
+    SEC_CAL_SEGMENTS("Show Segments (color bands on the day)"),
+    SEC_CAL_DOTS("Show Dots (color dots under the date)"),
+    SEC_CAL_MANIPULATION("Allow Calendar Manipulation (mark past/future days)"),
+    SEC_CAL_GRANT("Grant rewards on completion (XP / score / debuffs / hooks)"),
+    SEC_CAL_JOURNAL("Enable Journal (write per-day notes)"),
+    SEC_CAL_JOURNAL_ONLY("Journal Only (notes replace the Task List)"),
+    SEC_CAL_DESC("Define the calendar's tasks on the page itself. Mark a day done to color it; toggle which indicators show above. Right-click a day for journal / favorite / customize options."),
+
+    // ---------------------------------------------------------------------
+    // Setup Wizard
+    // ---------------------------------------------------------------------
+    WIZ_TITLE("Welcome to Statmaxxer"),
+    WIZ_HEADER("Let's set things up"),
+    WIZ_SUB("You can change any of this later in Settings."),
+    WIZ_SEC_PROFILE("1 · Your Profile"),
+    WIZ_SEC_PROFILE_DESC("Names your active profile and how the app greets you."),
+    WIZ_LBL_DISPLAY_NAME("Display name:"),
+    WIZ_PROMPT_NAME("Your name / profile name"),
+    WIZ_SEC_SECTIONS("2 · Sections"),
+    WIZ_SEC_SECTIONS_DESC("Pick a starting point for your pages."),
+    WIZ_KEEP_STARTER("Keep starter sections (Quick, Daily, Work)"),
+    WIZ_START_EMPTY("Start empty — I'll create my own"),
+    WIZ_SEC_APPEARANCE("3 · Appearance"),
+    WIZ_SEC_APPEARANCE_DESC("Checkbox theme and the app-wide font (includes Retro, Pixel Art, Matrix)."),
+    WIZ_LBL_CHECKBOX_THEME("Checkbox theme:"),
+    WIZ_LBL_FONT_STYLE("Font style:"),
+    WIZ_SEC_PERSONAL("4 · Personal & Behavior"),
+    WIZ_SEC_PERSONAL_DESC("Used by the age analytics and app behavior."),
+    WIZ_LBL_TARGET_AGE("Target age:"),
+    WIZ_CHK_STARTUP("Launch on Windows startup"),
+    WIZ_CHK_NOTIFICATIONS("Enable desktop notifications"),
+    WIZ_BTN_FINISH("Finish Setup"),
+
+    // ---------------------------------------------------------------------
+    // Profiles
+    // ---------------------------------------------------------------------
+    PROFILE_DESC("Each profile is a separate world with its own tasks, sections, and stats. The active profile is remembered the next time you launch."),
+    PROFILE_ACTIVE_LABEL("Active profile: {0}"),
+    PROFILE_SWITCH_HEADER("Switch Profile"),
+    PROFILE_SWITCH_BODY("Switch to profile \"{0}\"? Your current profile is saved automatically."),
+    PROFILE_NEW_HEADER("New Profile"),
+    PROFILE_NEW_PROMPT("Name for the new profile:"),
+    PROFILE_CREATED_SWITCH_HEADER("Switch to New Profile?"),
+    PROFILE_CREATED_SWITCH_BODY("Profile \"{0}\" created. Switch to it now?"),
+    PROFILE_RENAME_HEADER("Rename Profile"),
+    PROFILE_RENAME_PROMPT("New name for \"{0}\":"),
+    PROFILE_CANT_DELETE_DEFAULT("The Default profile cannot be deleted."),
+    PROFILE_CANT_DELETE_ACTIVE("You cannot delete the profile you are currently using. Switch to another profile first."),
+    PROFILE_DELETE_HEADER("Delete Profile"),
+    PROFILE_DELETE_BODY("Permanently delete profile \"{0}\" and all of its data? This cannot be undone."),
+    PROFILE_DELETE_FAILED("This profile could not be deleted."),
+
+    // ---------------------------------------------------------------------
+    // Settings page chrome / loading
+    // ---------------------------------------------------------------------
+    SETTINGS_SHOW_SECTION("👁 Show {0}"),
+    SETTINGS_HIDE_SECTION("🙈 Hide"),
+    SETTINGS_HIDE_TOOLTIP("Hide this section"),
+    SETTINGS_SHOW_TOOLTIP("Show this section"),
+    TEMPLATE_NONE_FOR_SECTION("No templates for this section."),
+    LOADING_TASKS("Loading your tasks…"),
+    LOADING_SWITCHING_PROFILE("Switching profile…"),
+
+    // ---------------------------------------------------------------------
     // Misc / generic
     // ---------------------------------------------------------------------
     NOTIFY_DEBUFF_CLEANSED_TITLE("Debuff Cleansed!"),

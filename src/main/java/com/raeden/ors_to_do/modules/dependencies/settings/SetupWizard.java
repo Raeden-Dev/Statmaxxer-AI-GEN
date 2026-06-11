@@ -2,6 +2,7 @@ package com.raeden.ors_to_do.modules.dependencies.settings;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.storage.ProfileManager;
+import com.raeden.ors_to_do.i18n.Lang;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.modules.dependencies.services.WindowsStartupManager;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
@@ -23,34 +24,34 @@ public final class SetupWizard {
 
     public static void show(AppStats appStats, Runnable onFinish) {
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Welcome to Statmaxxer");
+        dialog.setTitle(Lang.WIZ_TITLE.get());
         TaskDialogs.styleDialog(dialog);
 
         VBox content = new VBox(16);
         content.setPadding(new Insets(16));
         content.setPrefWidth(520);
 
-        Label welcome = new Label("Let's set things up");
+        Label welcome = new Label(Lang.WIZ_HEADER.get());
         welcome.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #569CD6;");
-        Label sub = new Label("You can change any of this later in Settings.");
+        Label sub = new Label(Lang.WIZ_SUB.get());
         sub.setStyle("-fx-text-fill: #858585; -fx-font-size: 12px;");
         content.getChildren().addAll(welcome, sub);
 
         // --- 1. Profile / display name ---
         TextField nameField = new TextField(appStats.getUserDisplayName());
-        nameField.setPromptText("Your name / profile name");
-        content.getChildren().add(section("1 · Your Profile",
-                "Names your active profile and how the app greets you.",
-                labeled("Display name:", nameField)));
+        nameField.setPromptText(Lang.WIZ_PROMPT_NAME.get());
+        content.getChildren().add(section(Lang.WIZ_SEC_PROFILE.get(),
+                Lang.WIZ_SEC_PROFILE_DESC.get(),
+                labeled(Lang.WIZ_LBL_DISPLAY_NAME.get(), nameField)));
 
         // --- 2. Starter sections ---
         ToggleGroup sectionsGroup = new ToggleGroup();
-        RadioButton keepStarter = new RadioButton("Keep starter sections (Quick, Daily, Work)");
+        RadioButton keepStarter = new RadioButton(Lang.WIZ_KEEP_STARTER.get());
         keepStarter.setToggleGroup(sectionsGroup); keepStarter.setSelected(true); keepStarter.setStyle("-fx-text-fill: white;");
-        RadioButton startEmpty = new RadioButton("Start empty — I'll create my own");
+        RadioButton startEmpty = new RadioButton(Lang.WIZ_START_EMPTY.get());
         startEmpty.setToggleGroup(sectionsGroup); startEmpty.setStyle("-fx-text-fill: white;");
-        content.getChildren().add(section("2 · Sections",
-                "Pick a starting point for your pages.",
+        content.getChildren().add(section(Lang.WIZ_SEC_SECTIONS.get(),
+                Lang.WIZ_SEC_SECTIONS_DESC.get(),
                 new VBox(6, keepStarter, startEmpty)));
 
         // --- 3. Appearance ---
@@ -60,21 +61,21 @@ public final class SetupWizard {
         ComboBox<String> fontBox = new ComboBox<>();
         fontBox.getItems().addAll(FontManager.options());
         fontBox.setValue(FontManager.normalize(appStats.getTaskFontFamily()));
-        content.getChildren().add(section("3 · Appearance",
-                "Checkbox theme and the app-wide font (includes Retro, Pixel Art, Matrix).",
-                new VBox(8, labeled("Checkbox theme:", themeBox), labeled("Font style:", fontBox))));
+        content.getChildren().add(section(Lang.WIZ_SEC_APPEARANCE.get(),
+                Lang.WIZ_SEC_APPEARANCE_DESC.get(),
+                new VBox(8, labeled(Lang.WIZ_LBL_CHECKBOX_THEME.get(), themeBox), labeled(Lang.WIZ_LBL_FONT_STYLE.get(), fontBox))));
 
         // --- 4. Personal & behavior ---
         DatePicker birthday = new DatePicker(appStats.getUserBirthDate());
         Spinner<Integer> targetAge = new Spinner<>(1, 150, appStats.getUserTargetAge());
         targetAge.setEditable(true);
-        CheckBox startup = new CheckBox("Launch on Windows startup"); startup.setSelected(appStats.isRunOnStartup()); startup.setStyle("-fx-text-fill: white;");
-        CheckBox notifications = new CheckBox("Enable desktop notifications"); notifications.setSelected(appStats.isEnableNotifications()); notifications.setStyle("-fx-text-fill: white;");
-        content.getChildren().add(section("4 · Personal & Behavior",
-                "Used by the age analytics and app behavior.",
+        CheckBox startup = new CheckBox(Lang.WIZ_CHK_STARTUP.get()); startup.setSelected(appStats.isRunOnStartup()); startup.setStyle("-fx-text-fill: white;");
+        CheckBox notifications = new CheckBox(Lang.WIZ_CHK_NOTIFICATIONS.get()); notifications.setSelected(appStats.isEnableNotifications()); notifications.setStyle("-fx-text-fill: white;");
+        content.getChildren().add(section(Lang.WIZ_SEC_PERSONAL.get(),
+                Lang.WIZ_SEC_PERSONAL_DESC.get(),
                 new VBox(8,
                         labeled("Birthday:", birthday),
-                        labeled("Target age:", targetAge),
+                        labeled(Lang.WIZ_LBL_TARGET_AGE.get(), targetAge),
                         startup, notifications)));
 
         ScrollPane sp = new ScrollPane(content);
@@ -84,7 +85,7 @@ public final class SetupWizard {
         sp.setBorder(Border.EMPTY);
 
         dialog.getDialogPane().setContent(sp);
-        ButtonType finishType = new ButtonType("Finish Setup", ButtonBar.ButtonData.OK_DONE);
+        ButtonType finishType = new ButtonType(Lang.WIZ_BTN_FINISH.get(), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().add(finishType);
 
         dialog.showAndWait();

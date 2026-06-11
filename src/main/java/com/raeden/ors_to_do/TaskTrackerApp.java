@@ -178,7 +178,7 @@ public class TaskTrackerApp extends Application {
 
         // Show a brief loading screen, then build the UI on the next pulse so it actually renders
         // before the (potentially heavy) session build runs.
-        showLoading("Loading your tasks…");
+        showLoading(com.raeden.ors_to_do.i18n.Lang.LOADING_TASKS.get());
         Platform.runLater(() -> {
             buildSession(primaryStage);
             GlobalActivityTracker.init();
@@ -270,7 +270,7 @@ public class TaskTrackerApp extends Application {
         StorageManager.saveStats(appStats);
 
         // Show the loading screen, then do the (possibly heavy) reload + rebuild on the next pulse.
-        showLoading("Switching profile…");
+        showLoading(com.raeden.ors_to_do.i18n.Lang.LOADING_SWITCHING_PROFILE.get());
         Platform.runLater(() -> {
             ProfileManager.setActive(newProfileId);
             taskDatabase = StorageManager.loadTasks();

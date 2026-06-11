@@ -50,6 +50,8 @@ public class SectionConfig implements Serializable {
     private List<String> calendarFavoriteDays = new ArrayList<>();                 // iso list
     private Map<String, String> calendarDayIcons = new java.util.HashMap<>();      // iso -> icon symbol
     private Map<String, String> calendarDayIconColors = new java.util.HashMap<>(); // iso -> icon color
+    private Map<String, String> calendarDayBgColors = new java.util.HashMap<>();      // iso -> cell background
+    private Map<String, String> calendarDayOutlineColors = new java.util.HashMap<>(); // iso -> cell outline
 
     private boolean showPriority = true;
     private boolean trackTime = false;
@@ -312,6 +314,24 @@ public class SectionConfig implements Serializable {
             getCalendarDayIcons().put(isoDate, symbol);
             getCalendarDayIconColors().put(isoDate, color == null ? "#FFFFFF" : color);
         }
+    }
+
+    // --- Per-day cell styling (Journal-Only mode: days are customizable like cards) ---
+    public Map<String, String> getCalendarDayBgColors() {
+        if (calendarDayBgColors == null) calendarDayBgColors = new java.util.HashMap<>();
+        return calendarDayBgColors;
+    }
+    public Map<String, String> getCalendarDayOutlineColors() {
+        if (calendarDayOutlineColors == null) calendarDayOutlineColors = new java.util.HashMap<>();
+        return calendarDayOutlineColors;
+    }
+    public String getDayBgColor(String isoDate) { return getCalendarDayBgColors().get(isoDate); }
+    public String getDayOutlineColor(String isoDate) { return getCalendarDayOutlineColors().get(isoDate); }
+    public void setDayStyle(String isoDate, String bgColor, String outlineColor) {
+        if (bgColor == null || bgColor.equals("transparent")) getCalendarDayBgColors().remove(isoDate);
+        else getCalendarDayBgColors().put(isoDate, bgColor);
+        if (outlineColor == null || outlineColor.equals("transparent")) getCalendarDayOutlineColors().remove(isoDate);
+        else getCalendarDayOutlineColors().put(isoDate, outlineColor);
     }
 
     public boolean isShowPriority() { return showPriority; }
