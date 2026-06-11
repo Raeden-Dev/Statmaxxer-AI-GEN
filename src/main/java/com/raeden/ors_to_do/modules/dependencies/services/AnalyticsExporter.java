@@ -68,6 +68,33 @@ public class AnalyticsExporter {
                 monthHeader.append("<th style=\"color:").append(t.getColorHex()).append("\">").append(escape(t.getName())).append("</th>");
             }
 
+            // --- Journal & favorites section ---
+            StringBuilder journalSection = new StringBuilder();
+            java.util.List<String> favs = new java.util.ArrayList<>(config.getCalendarFavoriteDays());
+            java.util.Collections.sort(favs);
+            if (!favs.isEmpty()) {
+                journalSection.append("<p class=\"favs\"><b style=\"color:#FFD700\">★ Favorite days:</b> ")
+                        .append(String.join(", ", favs)).append("</p>");
+            }
+            Map<String, java.util.List<com.raeden.ors_to_do.dependencies.models.CalendarEntry>> entries = config.getCalendarEntries();
+            if (!entries.isEmpty()) {
+                java.util.List<String> keys = new java.util.ArrayList<>(entries.keySet());
+                java.util.Collections.sort(keys);
+                journalSection.append("<h2 style=\"color:#C586C0;\">Journal &amp; Events</h2>");
+                for (String k : keys) {
+                    java.util.List<com.raeden.ors_to_do.dependencies.models.CalendarEntry> dayEntries = entries.get(k);
+                    if (dayEntries == null || dayEntries.isEmpty()) continue;
+                    journalSection.append("<div class=\"journal\"><div class=\"jdate\">").append(k);
+                    if (config.isFavoriteDay(k)) journalSection.append(" ★");
+                    journalSection.append("</div>");
+                    for (var en : dayEntries) {
+                        String tag = en.isEvent() ? "<span style=\"color:#C586C0;font-size:11px;\">[event] </span>" : "";
+                        journalSection.append("<div class=\"jtext\">").append(tag).append(htmlText(en.getText())).append("</div>");
+                    }
+                    journalSection.append("</div>");
+                }
+            }
+
             String html = """
             <!DOCTYPE html>
             <html lang="en"><head><meta charset="UTF-8">
@@ -85,6 +112,10 @@ public class AnalyticsExporter {
                 table { width:100%%; border-collapse:collapse; background:#2D2D30; border-radius:10px; overflow:hidden; }
                 th,td { padding:10px 14px; text-align:center; border-bottom:1px solid #3E3E42; }
                 th { background:#252526; }
+                .favs { background:#2D2D30; padding:12px 16px; border-radius:8px; border:1px solid #3E3E42; margin:24px 0; }
+                .journal { background:#2D2D30; padding:14px 18px; border-radius:8px; border:1px solid #3E3E42; margin:12px 0; }
+                .jdate { color:#569CD6; font-weight:bold; margin-bottom:6px; }
+                .jtext { color:#DDDDDD; white-space:pre-wrap; }
             </style></head>
             <body>
                 <div class="header"><h1>%s — Calendar Tracker</h1>
@@ -93,6 +124,7 @@ public class AnalyticsExporter {
                 <div class="chart-container"><canvas id="c" height="100"></canvas></div>
                 <h2 style="color:#569CD6;">Monthly Breakdown</h2>
                 <table><thead><tr>%s</tr></thead><tbody>%s</tbody></table>
+                %s
                 <script>
                     Chart.defaults.color = '#AAAAAA';
                     new Chart(document.getElementById('c').getContext('2d'), {
@@ -107,6 +139,7 @@ public class AnalyticsExporter {
                     LocalDate.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy")),
                     totalMarks, config.getCalendarCompletions().size(),
                     cards.toString(), monthHeader.toString(), monthRows.toString(),
+                    journalSection.toString(),
                     labels.toString(), data.toString(), colors.toString()
             );
 
@@ -127,6 +160,12 @@ public class AnalyticsExporter {
     private static String escape(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "\\'");
+    }
+
+    /** HTML-escaping for body text (keeps quotes literal; preserves line breaks via the CSS). */
+    private static String htmlText(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     public static void exportSectionAnalytics(SectionConfig config, List<TaskItem> globalDatabase) {

@@ -29,6 +29,17 @@ public class QuickCaptureManager implements NativeKeyListener {
         this.onCaptureComplete = onCaptureComplete;
     }
 
+    /**
+     * Swaps the data this manager captures into without touching the native hook. Used on profile
+     * switch — re-registering the JNativeHook would reject events because its dispatch pool can't be
+     * restarted once {@code unregisterNativeHook()} has terminated it.
+     */
+    public void updateContext(AppStats appStats, List<TaskItem> taskDatabase, Runnable onCaptureComplete) {
+        this.appStats = appStats;
+        this.taskDatabase = taskDatabase;
+        this.onCaptureComplete = onCaptureComplete;
+    }
+
     public void register() {
         try {
             GlobalScreen.registerNativeHook();

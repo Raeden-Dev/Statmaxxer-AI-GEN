@@ -115,9 +115,14 @@ public class SectionEditDialog {
         CheckBox calDotsCheck = new CheckBox("Show Dots (color dots under the date)"); calDotsCheck.setSelected(config.isCalendarShowDots()); calDotsCheck.setStyle("-fx-text-fill: white;");
         CheckBox calManipulationCheck = new CheckBox("Allow Calendar Manipulation (mark past/future days)"); calManipulationCheck.setSelected(config.isAllowCalendarManipulation()); calManipulationCheck.setStyle("-fx-text-fill: white;");
         CheckBox calGrantXpCheck = new CheckBox("Grant rewards on completion (XP / score / debuffs / hooks)"); calGrantXpCheck.setSelected(config.isCalendarGrantsXp()); calGrantXpCheck.setStyle("-fx-text-fill: white;");
-        Label calDesc = new Label("Define the calendar's tasks on the page itself. Mark a day done to color it; toggle which indicators show above.");
+        CheckBox calJournalCheck = new CheckBox("Enable Journal (write per-day notes)"); calJournalCheck.setSelected(config.isCalendarJournalEnabled()); calJournalCheck.setStyle("-fx-text-fill: white;");
+        CheckBox calJournalOnlyCheck = new CheckBox("Journal Only (notes replace the Task List)"); calJournalOnlyCheck.setSelected(config.isCalendarJournalOnly()); calJournalOnlyCheck.setStyle("-fx-text-fill: white;");
+        // Journal-only implies journal enabled; keep the two checkboxes consistent.
+        calJournalOnlyCheck.selectedProperty().addListener((o, was, on) -> { if (on) calJournalCheck.setSelected(true); });
+        calJournalCheck.selectedProperty().addListener((o, was, on) -> { if (!on) calJournalOnlyCheck.setSelected(false); });
+        Label calDesc = new Label("Define the calendar's tasks on the page itself. Mark a day done to color it; toggle which indicators show above. Right-click a day for journal / favorite / icon options.");
         calDesc.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;"); calDesc.setWrapText(true);
-        calendarOptionsBox.getChildren().addAll(calHeader, calSegmentsCheck, calDotsCheck, calManipulationCheck, calGrantXpCheck, calDesc);
+        calendarOptionsBox.getChildren().addAll(calHeader, calSegmentsCheck, calDotsCheck, calManipulationCheck, calGrantXpCheck, calJournalCheck, calJournalOnlyCheck, calDesc);
         content.getChildren().add(calendarOptionsBox);
 
         // --- Features Grid ---
@@ -256,6 +261,7 @@ public class SectionEditDialog {
                 calendarPageCheck.setSelected(p.isCalendarPage());
                 calSegmentsCheck.setSelected(p.isCalendarShowSegments()); calDotsCheck.setSelected(p.isCalendarShowDots());
                 calManipulationCheck.setSelected(p.isAllowCalendarManipulation()); calGrantXpCheck.setSelected(p.isCalendarGrantsXp());
+                calJournalCheck.setSelected(p.isCalendarJournalEnabled()); calJournalOnlyCheck.setSelected(p.isCalendarJournalOnly());
                 enableOptionalTasksCheck.setSelected(p.isEnableOptionalTasks()); enableTaskStylingCheck.setSelected(p.isEnableTaskStyling());
                 enableTimedTasksCheck.setSelected(p.isEnableTimedTasks());
                 allowRepeatingTasksCheck.setSelected(p.isAllowRepeatingTasks());
@@ -290,6 +296,7 @@ public class SectionEditDialog {
                 newPreset.setCalendarPage(calendarPageCheck.isSelected());
                 newPreset.setCalendarShowSegments(calSegmentsCheck.isSelected()); newPreset.setCalendarShowDots(calDotsCheck.isSelected());
                 newPreset.setAllowCalendarManipulation(calManipulationCheck.isSelected()); newPreset.setCalendarGrantsXp(calGrantXpCheck.isSelected());
+                newPreset.setCalendarJournalEnabled(calJournalCheck.isSelected()); newPreset.setCalendarJournalOnly(calJournalOnlyCheck.isSelected());
                 newPreset.setEnableOptionalTasks(enableOptionalTasksCheck.isSelected()); newPreset.setEnableTaskStyling(enableTaskStylingCheck.isSelected());
                 newPreset.setEnableTimedTasks(enableTimedTasksCheck.isSelected());
                 newPreset.setAllowRepeatingTasks(allowRepeatingTasksCheck.isSelected());
@@ -336,6 +343,7 @@ public class SectionEditDialog {
                 config.setCalendarPage(calendarPageCheck.isSelected());
                 config.setCalendarShowSegments(calSegmentsCheck.isSelected()); config.setCalendarShowDots(calDotsCheck.isSelected());
                 config.setAllowCalendarManipulation(calManipulationCheck.isSelected()); config.setCalendarGrantsXp(calGrantXpCheck.isSelected());
+                config.setCalendarJournalEnabled(calJournalCheck.isSelected()); config.setCalendarJournalOnly(calJournalOnlyCheck.isSelected());
                 config.setAutoArchive(autoArchiveCheck.isSelected()); config.setShowPriority(showPriorityCheck.isSelected());
                 config.setTrackTime(trackTimeCheck.isSelected()); config.setShowTaskType(showTaskTypeCheck.isSelected());
                 config.setAllowFavorite(favoriteCheck.isSelected()); config.setShowAnalytics(showAnalyticsCheck.isSelected());

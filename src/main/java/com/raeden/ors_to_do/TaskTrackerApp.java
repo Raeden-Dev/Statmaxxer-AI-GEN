@@ -43,6 +43,9 @@ public class TaskTrackerApp extends Application {
     private SidebarManager sidebarManager;
     private QuickCaptureManager quickCaptureManager;
 
+    /** True on a genuinely fresh install (no data yet) so the setup wizard runs once. */
+    private boolean firstLaunch = false;
+
     @Override
     public void init() throws Exception {
         // Point storage at the previously-active profile before any data is loaded.
@@ -50,6 +53,9 @@ public class TaskTrackerApp extends Application {
 
         taskDatabase = StorageManager.loadTasks();
         appStats = StorageManager.loadStats();
+
+        // Detect a brand-new install BEFORE migration creates the default sections.
+        firstLaunch = !appStats.isSetupCompleted() && appStats.getSections().isEmpty() && taskDatabase.isEmpty();
 
         runSilentDataMigration();
         DailyRolloverManager.processDailyRollover(appStats, taskDatabase);
@@ -170,8 +176,38 @@ public class TaskTrackerApp extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        buildSession(primaryStage);
-        GlobalActivityTracker.init();
+        // Show a brief loading screen, then build the UI on the next pulse so it actually renders
+        // before the (potentially heavy) session build runs.
+        showLoading("Loading your tasks…");
+        Platform.runLater(() -> {
+            buildSession(primaryStage);
+            GlobalActivityTracker.init();
+            if (firstLaunch) {
+                com.raeden.ors_to_do.modules.dependencies.settings.SetupWizard.show(appStats, () -> {
+                    com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(scene, appStats.getTaskFontFamily());
+                    buildSession(primaryStage);
+                });
+            }
+        });
+    }
+
+    /** Replaces the main content with a simple branded loading view. */
+    private void showLoading(String message) {
+        javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(18);
+        box.setAlignment(javafx.geometry.Pos.CENTER);
+        box.setStyle("-fx-background-color: #1E1E1E;");
+
+        Label title = new Label("Statmaxxer");
+        title.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #569CD6;");
+        javafx.scene.control.ProgressIndicator spinner = new javafx.scene.control.ProgressIndicator();
+        spinner.setPrefSize(48, 48);
+        spinner.setStyle("-fx-progress-color: #569CD6;");
+        Label msg = new Label(message);
+        msg.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 13px;");
+
+        box.getChildren().addAll(title, spinner, msg);
+        rootLayout.setLeft(null);
+        rootLayout.setCenter(box);
     }
 
     /**
@@ -187,9 +223,15 @@ public class TaskTrackerApp extends Application {
             if (sidebarManager != null) sidebarManager.refreshSidebar();
         };
 
-        if (quickCaptureManager != null) quickCaptureManager.unregister();
-        quickCaptureManager = new QuickCaptureManager(appStats, taskDatabase, syncUI);
-        quickCaptureManager.register();
+        // Register the global hotkey hook once for the app's lifetime. On profile switch we only
+        // swap its data references — re-registering JNativeHook crashes its (terminated) dispatch
+        // pool with a RejectedExecutionException.
+        if (quickCaptureManager == null) {
+            quickCaptureManager = new QuickCaptureManager(appStats, taskDatabase, syncUI);
+            quickCaptureManager.register();
+        } else {
+            quickCaptureManager.updateContext(appStats, taskDatabase, syncUI);
+        }
 
         globalSearchBar = new GlobalSearchBar((query) -> {
             if (query == null || query.trim().isEmpty()) {
@@ -227,19 +269,22 @@ public class TaskTrackerApp extends Application {
         StorageManager.saveTasks(taskDatabase);
         StorageManager.saveStats(appStats);
 
-        // Repoint storage and reload the target profile's world.
-        ProfileManager.setActive(newProfileId);
-        taskDatabase = StorageManager.loadTasks();
-        appStats = StorageManager.loadStats();
-        runSilentDataMigration();
-        DailyRolloverManager.processDailyRollover(appStats, taskDatabase);
+        // Show the loading screen, then do the (possibly heavy) reload + rebuild on the next pulse.
+        showLoading("Switching profile…");
+        Platform.runLater(() -> {
+            ProfileManager.setActive(newProfileId);
+            taskDatabase = StorageManager.loadTasks();
+            appStats = StorageManager.loadStats();
+            runSilentDataMigration();
+            DailyRolloverManager.processDailyRollover(appStats, taskDatabase);
 
-        buildSession(MAIN_STAGE);
+            buildSession(MAIN_STAGE);
 
-        if (MAIN_STAGE.getScene() != null) {
-            com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(MAIN_STAGE.getScene(), appStats.getTaskFontFamily());
-        }
-        MAIN_STAGE.setAlwaysOnTop(appStats.isAlwaysOnTop());
+            if (MAIN_STAGE.getScene() != null) {
+                com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(MAIN_STAGE.getScene(), appStats.getTaskFontFamily());
+            }
+            MAIN_STAGE.setAlwaysOnTop(appStats.isAlwaysOnTop());
+        });
     }
 
     private void shutdownApp() {

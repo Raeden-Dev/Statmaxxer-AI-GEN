@@ -18,6 +18,26 @@ All notable changes to the project are recorded here, newest first. Dates use IS
   - **Task List** of cards below the calendar: an add-task card plus one card per task. Click a
     card to make it the marking "brush", use the **⚙ gear** to configure it, and **right-click to
     delete** it.
+  - **Journal, favorites & day icons:** right-click any day for a menu — journal, **Favorite Day**
+    (gold ★ + border, plus a **★ Favorites** filter entry), **Set Day Icon**, and **Clear Day
+    Marks**. Days with a note show a 📝 indicator. Enable per-section via **Enable Journal**.
+  - **Journal-Only mode with multiple entries & events:** turn on **Journal Only** to replace the
+    Task List with a per-day panel — click a day and the bottom area shows that day's **journal
+    entries and events**, each a **fully customizable card** (text, background, outline, icon, with
+    a 🎲 randomize) edited via its ⚙ gear or right-click. Add as many journal entries and **events**
+    (shown with a small "event" tag) per day as you like. In Task+Journal mode a day keeps a single
+    note. All entries are included in the HTML export.
+
+### Added (app)
+- **First-launch Setup Wizard** — on a brand-new install, a guided setup covers profile/display
+  name, starter sections, appearance (theme + font), and personal/behavior preferences. Runs once.
+- **Loading screen** — a brief branded loading view shows on app launch and when switching profiles
+  so large data sets don't appear to freeze.
+
+### Fixed
+- **Profile switching crash** — switching profiles no longer throws a
+  `RejectedExecutionException` from the global hotkey hook (the JNativeHook dispatch pool is kept
+  alive; only its data references are swapped).
   - **Rich calendar tasks:** each task has a **colour and icon** (the icon shows on marked days),
     a **🎲 Randomize** button, and — when the section's *Grant rewards on completion* toggle is on —
     can award **XP to multiple Custom Stats**, **stat Max-Cap increases**, **global score points**,

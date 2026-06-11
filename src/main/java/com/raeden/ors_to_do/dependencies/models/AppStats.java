@@ -22,6 +22,10 @@ public class AppStats implements Serializable {
     private int taskFontSize = 14;
     private String taskFontFamily = "Default";
     private String checkboxTheme = "Default";
+
+    // First-launch setup wizard state + an optional display name set there.
+    private boolean setupCompleted = false;
+    private String userDisplayName = "";
     private int zenModeThreshold = 20;
     private int focusInactivityThreshold = 5;
     private int minDailyCompletionPercent = 100;
@@ -101,6 +105,10 @@ public class AppStats implements Serializable {
     public void setShowSidebarTaskCount(boolean showSidebarTaskCount) { this.showSidebarTaskCount = showSidebarTaskCount; }
     public int getTaskFontSize() { return taskFontSize == 0 ? 14 : taskFontSize; }
     public void setTaskFontSize(int taskFontSize) { this.taskFontSize = taskFontSize; }
+    public boolean isSetupCompleted() { return setupCompleted; }
+    public void setSetupCompleted(boolean setupCompleted) { this.setupCompleted = setupCompleted; }
+    public String getUserDisplayName() { return userDisplayName == null ? "" : userDisplayName; }
+    public void setUserDisplayName(String userDisplayName) { this.userDisplayName = userDisplayName; }
     public String getTaskFontFamily() { return taskFontFamily == null ? "Default" : taskFontFamily; }
     public void setTaskFontFamily(String taskFontFamily) { this.taskFontFamily = taskFontFamily; }
     public String getCheckboxTheme() { return checkboxTheme == null ? "Default" : checkboxTheme; }

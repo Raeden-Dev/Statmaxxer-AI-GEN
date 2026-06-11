@@ -1,6 +1,7 @@
 package com.raeden.ors_to_do.modules.dependencies.ui.layout;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
+import com.raeden.ors_to_do.dependencies.models.CalendarEntry;
 import com.raeden.ors_to_do.dependencies.models.CalendarTask;
 import com.raeden.ors_to_do.dependencies.models.CustomStat;
 import com.raeden.ors_to_do.dependencies.models.Debuff;
@@ -45,13 +46,18 @@ public class CalendarPage extends BorderPane {
     private YearMonth currentMonth = YearMonth.now();
     private CalendarTask brushTask;
     private CalendarTask displayFilter;
+    private LocalDate selectedDate; // Journal-Only: the day whose entries the bottom panel shows
 
     private final Label titleLabel = new Label();
     private final Label monthLabel = new Label();
     private final Label hintLabel = new Label();
     private final GridPane grid = new GridPane();
     private final VBox taskListBox = new VBox(8);
+    private final Label bottomTitle = new Label("Task List");
     private final ComboBox<CalendarTask> filterBox = new ComboBox<>();
+
+    /** Special filter entry (identity-compared) that shows only favorited days. */
+    private static final CalendarTask FAVORITES_SENTINEL = new CalendarTask("★ Favorites");
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -76,6 +82,8 @@ public class CalendarPage extends BorderPane {
         // No outer padding: the hosting BorderPane (DynamicModule.mainContent) already insets by
         // 15, matching every other page. Adding our own here would double it and offset the page.
         setStyle("-fx-background-color: #1E1E1E;");
+
+        if (config.isCalendarJournalOnly()) selectedDate = LocalDate.now();
 
         VBox top = new VBox(10, buildDashboardStrip(), buildFilterRow());
         setTop(top);
@@ -157,10 +165,9 @@ public class CalendarPage extends BorderPane {
             grid.getColumnConstraints().add(cc);
         }
 
-        Label listTitle = new Label("Task List");
-        listTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
+        bottomTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
 
-        VBox content = new VBox(14, grid, new Separator(), listTitle, taskListBox);
+        VBox content = new VBox(14, grid, new Separator(), bottomTitle, taskListBox);
         content.setPadding(new Insets(10, 0, 10, 0));
 
         ScrollPane sp = new ScrollPane(content);
@@ -196,20 +203,48 @@ public class CalendarPage extends BorderPane {
             grid.add(buildDayCell(date, date.equals(today)), col, row);
             if (++col > 6) { col = 0; row++; }
         }
+
+        // The journal list is month-scoped, so keep it in sync as the month changes.
+        if (config.isCalendarJournalOnly()) renderTaskList();
     }
 
     private Region buildDayCell(LocalDate date, boolean isToday) {
         String iso = date.format(ISO);
-        List<String> completed = filteredCompletions(iso);
+        boolean favView = (displayFilter == FAVORITES_SENTINEL);
+        boolean fav = config.isFavoriteDay(iso);
+        boolean dimmed = favView && !fav;
+        List<String> completed = dimmed ? List.of() : filteredCompletions(iso);
+        boolean hasNote = config.isCalendarJournalEnabled() && config.hasDayEntries(iso);
+        boolean hasIcon = config.hasDayIcon(iso);
+        boolean isSelectedDay = config.isCalendarJournalOnly() && selectedDate != null && selectedDate.equals(date);
 
         VBox cell = new VBox(2);
         cell.setMinHeight(72);
         cell.setPadding(new Insets(4));
-        cell.setAlignment(Pos.TOP_RIGHT);
 
+        // Top row: left indicators (favorite / day-icon / note) + day number on the right.
+        HBox topRow = new HBox(3);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+        if (fav) {
+            Label star = new Label("★");
+            star.setStyle("-fx-text-fill: #FFD700; -fx-font-size: 12px;");
+            topRow.getChildren().add(star);
+        }
+        if (hasIcon) {
+            Label di = new Label(config.getDayIcon(iso));
+            di.setStyle("-fx-text-fill: " + config.getDayIconColor(iso) + "; -fx-font-size: 12px;");
+            topRow.getChildren().add(di);
+        }
+        if (hasNote) {
+            Label noteMark = new Label("📝");
+            noteMark.setStyle("-fx-font-size: 11px;");
+            topRow.getChildren().add(noteMark);
+        }
+        Region topSpacer = new Region(); HBox.setHgrow(topSpacer, Priority.ALWAYS);
         Label num = new Label(String.valueOf(date.getDayOfMonth()));
         num.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
-        cell.getChildren().add(num);
+        topRow.getChildren().addAll(topSpacer, num);
+        cell.getChildren().add(topRow);
 
         if (config.isCalendarShowDots() && !completed.isEmpty()) {
             FlowPane marks = new FlowPane(3, 3);
@@ -219,7 +254,6 @@ public class CalendarPage extends BorderPane {
                 CalendarTask t = config.findCalendarTask(tid);
                 if (t == null) continue;
                 if (t.hasIcon()) {
-                    // Icon replaces the plain dot as this task's indicator on the day.
                     Label ico = new Label(t.getIconSymbol());
                     ico.setStyle("-fx-text-fill: " + t.getIconColor() + "; -fx-font-size: 12px;");
                     marks.getChildren().add(ico);
@@ -231,13 +265,64 @@ public class CalendarPage extends BorderPane {
         }
 
         String bg = (config.isCalendarShowSegments() && !completed.isEmpty()) ? buildSegmentGradient(completed) : "#252526";
-        String border = isToday ? "-fx-border-color: #4EC9B0; -fx-border-width: 2;" : "-fx-border-color: #3E3E42; -fx-border-width: 1;";
-        String base = "-fx-background-color: " + bg + "; -fx-background-radius: 5; -fx-border-radius: 5; " + border + " -fx-cursor: hand;";
+        String borderColor; int borderW;
+        if (isSelectedDay) { borderColor = "#569CD6"; borderW = 2; }
+        else if (fav) { borderColor = "#FFD700"; borderW = 2; }
+        else if (isToday) { borderColor = "#4EC9B0"; borderW = 2; }
+        else { borderColor = "#3E3E42"; borderW = 1; }
+        String baseStyle = "-fx-background-color: " + bg + "; -fx-background-radius: 5; -fx-border-radius: 5; -fx-border-color: " + borderColor + "; -fx-border-width: " + borderW + "; -fx-cursor: hand;";
+        if (dimmed) baseStyle += " -fx-opacity: 0.35;";
+        final String base = baseStyle;
         cell.setStyle(base);
-        cell.setOnMouseEntered(e -> cell.setStyle(base + " -fx-effect: dropshadow(gaussian, rgba(86,156,214,0.5), 6, 0, 0, 0);"));
+        final String hover = base + " -fx-effect: dropshadow(gaussian, rgba(86,156,214,0.5), 6, 0, 0, 0);";
+        cell.setOnMouseEntered(e -> cell.setStyle(hover));
         cell.setOnMouseExited(e -> cell.setStyle(base));
-        cell.setOnMouseClicked(e -> onDayClicked(date));
+        cell.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) onDayClicked(date); });
+        cell.setOnContextMenuRequested(e -> buildDayMenu(date).show(cell, e.getScreenX(), e.getScreenY()));
         return cell;
+    }
+
+    private ContextMenu buildDayMenu(LocalDate date) {
+        String iso = date.format(ISO);
+        ContextMenu m = new ContextMenu();
+
+        if (config.isCalendarJournalOnly()) {
+            MenuItem viewDay = new MenuItem("View / Add Entries");
+            viewDay.setOnAction(e -> { selectedDate = date; renderCalendar(); renderTaskList(); });
+            MenuItem addJournal = new MenuItem("Add Journal Entry…");
+            addJournal.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, false); });
+            MenuItem addEvent = new MenuItem("Add Event…");
+            addEvent.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, true); });
+            m.getItems().addAll(viewDay, addJournal, addEvent);
+        } else if (config.isCalendarJournalEnabled()) {
+            MenuItem j = new MenuItem(config.hasDayNote(iso) ? "Edit Journal Entry" : "Add Journal Entry");
+            j.setOnAction(e -> openJournalEditor(date));
+            m.getItems().add(j);
+        }
+
+        MenuItem favItem = new MenuItem(config.isFavoriteDay(iso) ? "Unfavorite Day" : "Favorite Day");
+        favItem.setOnAction(e -> {
+            config.toggleFavoriteDay(iso);
+            StorageManager.saveStats(appStats);
+            renderCalendar();
+        });
+        m.getItems().add(favItem);
+
+        MenuItem iconItem = new MenuItem(config.hasDayIcon(iso) ? "Change Day Icon…" : "Set Day Icon…");
+        iconItem.setOnAction(e -> openDayIconDialog(date));
+        m.getItems().add(iconItem);
+        if (config.hasDayIcon(iso)) {
+            MenuItem clearIcon = new MenuItem("Clear Day Icon");
+            clearIcon.setOnAction(e -> { config.setDayIcon(iso, null, null); StorageManager.saveStats(appStats); renderCalendar(); });
+            m.getItems().add(clearIcon);
+        }
+
+        if (!config.getCompletedTaskIds(iso).isEmpty()) {
+            MenuItem clearMarks = new MenuItem("Clear Day Marks");
+            clearMarks.setOnAction(e -> clearDayMarks(date));
+            m.getItems().add(clearMarks);
+        }
+        return m;
     }
 
     private String buildSegmentGradient(List<String> ids) {
@@ -255,7 +340,7 @@ public class CalendarPage extends BorderPane {
 
     private List<String> filteredCompletions(String iso) {
         List<String> all = config.getCompletedTaskIds(iso);
-        if (displayFilter == null) return all;
+        if (displayFilter == null || displayFilter == FAVORITES_SENTINEL) return all;
         return all.contains(displayFilter.getId()) ? List.of(displayFilter.getId()) : List.of();
     }
 
@@ -263,6 +348,15 @@ public class CalendarPage extends BorderPane {
 
     private void onDayClicked(LocalDate date) {
         if (brushTask == null) {
+            // Journal-Only: clicking a day shows its entries/events in the bottom panel.
+            if (config.isCalendarJournalOnly()) {
+                selectedDate = date;
+                renderCalendar();   // refresh selected-day highlight
+                renderTaskList();   // refresh bottom detail panel
+                return;
+            }
+            // Task+Journal: a single note per day via the simple editor.
+            if (config.isCalendarJournalEnabled()) { openJournalEditor(date); return; }
             hintLabel.setText("Select a task card below first, then click a day to mark it.");
             return;
         }
@@ -278,6 +372,77 @@ public class CalendarPage extends BorderPane {
         hintLabel.setText("");
         renderCalendar();
         if (syncCallback != null) syncCallback.run();
+    }
+
+    private void clearDayMarks(LocalDate date) {
+        String iso = date.format(ISO);
+        List<String> ids = new ArrayList<>(config.getCompletedTaskIds(iso));
+        for (String id : ids) {
+            config.toggleCompletion(iso, id); // removes it
+            CalendarTask t = config.findCalendarTask(id);
+            if (t != null) applyRewards(t, false);
+        }
+        StorageManager.saveStats(appStats);
+        renderCalendar();
+        if (syncCallback != null) syncCallback.run();
+    }
+
+    private void openJournalEditor(LocalDate date) {
+        String iso = date.format(ISO);
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Journal — " + date.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy")));
+        TaskDialogs.styleDialog(dialog);
+
+        TextArea area = new TextArea(config.getDayNote(iso));
+        area.setWrapText(true);
+        area.setPrefRowCount(14);
+        area.setPrefColumnCount(42);
+        area.setStyle("-fx-control-inner-background: #252526; -fx-text-fill: #E0E0E0; -fx-highlight-fill: #569CD6;");
+
+        VBox box = new VBox(8, area);
+        box.setPadding(new Insets(10));
+        box.setPrefWidth(520);
+        dialog.getDialogPane().setContent(box);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        dialog.showAndWait().ifPresent(res -> {
+            if (res != ButtonType.OK) return;
+            config.setDayNote(iso, area.getText());
+            StorageManager.saveStats(appStats);
+            renderCalendar();
+            renderTaskList();
+        });
+    }
+
+    private void openDayIconDialog(LocalDate date) {
+        String iso = date.format(ISO);
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Day Icon — " + date.format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
+        TaskDialogs.styleDialog(dialog);
+
+        GridPane g = new GridPane();
+        g.setHgap(12); g.setVgap(10); g.setPadding(new Insets(10));
+
+        ComboBox<String> iconBox = new ComboBox<>();
+        iconBox.getItems().addAll(TaskDialogs.ICON_LIST);
+        iconBox.setValue(config.hasDayIcon(iso) ? config.getDayIcon(iso) : "None");
+        iconBox.getStylesheets().add(css(COMBO_CSS));
+        ColorPicker colorPicker = new ColorPicker(Color.web(config.getDayIconColor(iso)));
+
+        Label l1 = new Label("Icon:"); l1.setStyle("-fx-text-fill: #DDDDDD;");
+        Label l2 = new Label("Color:"); l2.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(l1, 0, 0); g.add(iconBox, 1, 0);
+        g.add(l2, 0, 1); g.add(colorPicker, 1, 1);
+
+        dialog.getDialogPane().setContent(g);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        dialog.showAndWait().ifPresent(res -> {
+            if (res != ButtonType.OK) return;
+            config.setDayIcon(iso, iconBox.getValue(), ColorUtil.toHex(colorPicker.getValue()));
+            StorageManager.saveStats(appStats);
+            renderCalendar();
+        });
     }
 
     /**
@@ -357,10 +522,180 @@ public class CalendarPage extends BorderPane {
 
     private void renderTaskList() {
         taskListBox.getChildren().clear();
+
+        // Journal-only: the bottom panel shows the SELECTED day's entries/events.
+        if (config.isCalendarJournalOnly()) {
+            renderDayDetail();
+            return;
+        }
+
+        bottomTitle.setText("Task List");
         taskListBox.getChildren().add(buildAddCard());
         for (CalendarTask t : config.getCalendarTasks()) {
             taskListBox.getChildren().add(buildTaskCard(t));
         }
+    }
+
+    private void renderDayDetail() {
+        if (selectedDate == null) {
+            bottomTitle.setText("Journal");
+            Label hint = new Label("Click a day above to view, add, or edit its journal entries and events.");
+            hint.setStyle("-fx-text-fill: #777777; -fx-font-style: italic;");
+            hint.setWrapText(true);
+            taskListBox.getChildren().add(hint);
+            return;
+        }
+
+        String iso = selectedDate.format(ISO);
+        bottomTitle.setText("Journal — " + selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy")));
+
+        Button addJournal = new Button("＋ Add Journal Entry");
+        addJournal.setStyle("-fx-background-color: #22543D; -fx-text-fill: white; -fx-cursor: hand; -fx-background-radius: 4;");
+        addJournal.setOnAction(e -> showEntryEditDialog(selectedDate, null, false));
+        Button addEvent = new Button("＋ Add Event");
+        addEvent.setStyle("-fx-background-color: #5A3D7A; -fx-text-fill: white; -fx-cursor: hand; -fx-background-radius: 4;");
+        addEvent.setOnAction(e -> showEntryEditDialog(selectedDate, null, true));
+        HBox addRow = new HBox(8, addJournal, addEvent);
+        taskListBox.getChildren().add(addRow);
+
+        List<CalendarEntry> entries = config.getDayEntries(iso);
+        if (entries.isEmpty()) {
+            Label none = new Label("No entries for this day yet. Add a journal entry or an event.");
+            none.setStyle("-fx-text-fill: #777777; -fx-font-style: italic;");
+            none.setWrapText(true);
+            taskListBox.getChildren().add(none);
+        } else {
+            for (CalendarEntry en : entries) taskListBox.getChildren().add(buildEntryCard(selectedDate, en));
+        }
+    }
+
+    private Region buildEntryCard(LocalDate date, CalendarEntry entry) {
+        String iso = date.format(ISO);
+        String bg = (entry.getBgColor() != null && !entry.getBgColor().equals("transparent")) ? entry.getBgColor() : "#2D2D30";
+        String outline = (entry.getOutlineColor() != null && !entry.getOutlineColor().equals("transparent")) ? entry.getOutlineColor() : "#3E3E42";
+
+        VBox card = new VBox(4);
+        card.setPadding(new Insets(10, 12, 10, 12));
+        card.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-width: 1; -fx-border-color: " + outline + "; -fx-cursor: hand;");
+
+        HBox header = new HBox(6);
+        header.setAlignment(Pos.CENTER_LEFT);
+        if (entry.hasIcon()) {
+            Label ico = new Label(entry.getIconSymbol());
+            ico.setStyle("-fx-text-fill: " + entry.getIconColor() + "; -fx-font-size: 13px;");
+            header.getChildren().add(ico);
+        }
+        if (entry.isEvent()) {
+            Label tag = new Label("event");
+            tag.setStyle("-fx-text-fill: #C586C0; -fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: #2A2330; -fx-border-color: #C586C0; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 1 7;");
+            header.getChildren().add(tag);
+        }
+        Region hSpacer = new Region(); HBox.setHgrow(hSpacer, Priority.ALWAYS);
+        Button gear = new Button("⚙");
+        gear.setStyle("-fx-background-color: transparent; -fx-text-fill: #AAAAAA; -fx-font-size: 14px; -fx-cursor: hand;");
+        Tooltip.install(gear, new Tooltip("Customize / edit"));
+        gear.setOnAction(e -> showEntryEditDialog(date, entry, entry.isEvent()));
+        gear.setOnMouseClicked(javafx.scene.input.MouseEvent::consume);
+        header.getChildren().addAll(hSpacer, gear);
+        card.getChildren().add(header);
+
+        Label body = new Label(entry.getText());
+        body.setStyle("-fx-text-fill: #E0E0E0; -fx-font-size: 12px;");
+        body.setWrapText(true);
+        card.getChildren().add(body);
+
+        card.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) showEntryEditDialog(date, entry, entry.isEvent()); });
+
+        ContextMenu menu = new ContextMenu();
+        MenuItem editItem = new MenuItem("Edit");
+        editItem.setOnAction(e -> showEntryEditDialog(date, entry, entry.isEvent()));
+        MenuItem delItem = new MenuItem("Delete");
+        delItem.setOnAction(e -> {
+            config.removeDayEntry(iso, entry.getId());
+            StorageManager.saveStats(appStats);
+            renderCalendar(); renderTaskList();
+        });
+        menu.getItems().addAll(editItem, delItem);
+        card.setOnContextMenuRequested(e -> menu.show(card, e.getScreenX(), e.getScreenY()));
+
+        return card;
+    }
+
+    /** Add/edit dialog for a customizable journal entry or event card (Journal-Only mode). */
+    private void showEntryEditDialog(LocalDate date, CalendarEntry existing, boolean isEvent) {
+        String iso = date.format(ISO);
+        boolean isNew = existing == null;
+        CalendarEntry entry = isNew ? new CalendarEntry(isEvent, "") : existing;
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle((isNew ? "Add " : "Edit ") + (isEvent ? "Event" : "Journal Entry"));
+        TaskDialogs.styleDialog(dialog);
+
+        GridPane g = new GridPane();
+        g.setHgap(12); g.setVgap(10); g.setPadding(new Insets(10));
+        ColumnConstraints c1 = new ColumnConstraints(); c1.setMinWidth(110);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS);
+        g.getColumnConstraints().addAll(c1, c2);
+
+        TextArea textArea = new TextArea(entry.getText());
+        textArea.setWrapText(true); textArea.setPrefRowCount(6);
+        textArea.setStyle("-fx-control-inner-background: #252526; -fx-text-fill: #E0E0E0; -fx-highlight-fill: #569CD6;");
+        Label tl = new Label("Text:"); tl.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(tl, 0, 0); g.add(textArea, 1, 0);
+
+        ColorPicker bgPicker = entryColorPicker(entry.getBgColor());
+        ColorPicker outlinePicker = entryColorPicker(entry.getOutlineColor());
+        Label bl = new Label("Background:"); bl.setStyle("-fx-text-fill: #DDDDDD;");
+        Label ol = new Label("Outline:"); ol.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(bl, 0, 1); g.add(bgPicker, 1, 1);
+        g.add(ol, 0, 2); g.add(outlinePicker, 1, 2);
+
+        ComboBox<String> iconBox = new ComboBox<>();
+        iconBox.getItems().addAll(TaskDialogs.ICON_LIST);
+        iconBox.setValue(entry.getIconSymbol());
+        iconBox.getStylesheets().add(css(COMBO_CSS));
+        ColorPicker iconColor = new ColorPicker(Color.web(entry.getIconColor()));
+        HBox iconRow = new HBox(10, iconBox, iconColor); iconRow.setAlignment(Pos.CENTER_LEFT);
+        Label il = new Label("Icon & Color:"); il.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(il, 0, 3); g.add(iconRow, 1, 3);
+
+        Button randomBtn = new Button("🎲 Randomize Style");
+        randomBtn.setMaxWidth(Double.MAX_VALUE);
+        randomBtn.setStyle("-fx-background-color: #3E3E42; -fx-text-fill: white; -fx-cursor: hand;");
+        randomBtn.setOnAction(e -> {
+            Random rand = new Random();
+            double hue = rand.nextDouble() * 360.0;
+            bgPicker.setValue(Color.hsb(hue, 0.7, 0.22));
+            outlinePicker.setValue(Color.hsb(hue, 0.8, 0.8));
+            iconBox.setValue(TaskDialogs.ICON_LIST[rand.nextInt(TaskDialogs.ICON_LIST.length - 1) + 1]);
+            iconColor.setValue(Color.hsb(hue, 0.5, 0.95));
+        });
+        g.add(randomBtn, 1, 4);
+
+        ScrollPane sp = new ScrollPane(g);
+        sp.setFitToWidth(true); sp.setPrefSize(480, 380);
+        sp.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
+        sp.setBorder(Border.EMPTY);
+        dialog.getDialogPane().setContent(sp);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        dialog.showAndWait().ifPresent(res -> {
+            if (res != ButtonType.OK) return;
+            entry.setText(textArea.getText() == null ? "" : textArea.getText());
+            entry.setBgColor(ColorUtil.toHexOrTransparent(bgPicker.getValue()));
+            entry.setOutlineColor(ColorUtil.toHexOrTransparent(outlinePicker.getValue()));
+            entry.setIconSymbol(iconBox.getValue());
+            entry.setIconColor(ColorUtil.toHex(iconColor.getValue()));
+            if (isNew) config.addDayEntry(iso, entry);
+            StorageManager.saveStats(appStats);
+            renderCalendar(); renderTaskList();
+        });
+    }
+
+    private ColorPicker entryColorPicker(String hex) {
+        ColorPicker cp = new ColorPicker();
+        cp.setValue(hex != null && !hex.equals("transparent") ? Color.web(hex) : Color.TRANSPARENT);
+        return cp;
     }
 
     private Region buildAddCard() {
@@ -463,6 +798,7 @@ public class CalendarPage extends BorderPane {
     private void refreshFilterBox() {
         filterBox.getItems().setAll(new ArrayList<>());
         filterBox.getItems().add(null); // "Show All"
+        filterBox.getItems().add(FAVORITES_SENTINEL); // "★ Favorites"
         filterBox.getItems().addAll(config.getCalendarTasks());
         filterBox.setValue(displayFilter);
     }

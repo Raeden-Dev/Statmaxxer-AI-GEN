@@ -41,6 +41,16 @@ public class SectionConfig implements Serializable {
     /** ISO date string ("yyyy-MM-dd") -> list of CalendarTask ids completed that day. */
     private Map<String, List<String>> calendarCompletions = new java.util.HashMap<>();
 
+    // --- Journal / favorite / per-day icon (all keyed by ISO date string) ---
+    private boolean calendarJournalEnabled = false;  // per-day notes available
+    private boolean calendarJournalOnly = false;     // notes replace the task list
+    private Map<String, String> calendarJournal = new java.util.HashMap<>();      // legacy: iso -> single note text
+    /** iso date -> customizable journal/event cards for that day. */
+    private Map<String, List<CalendarEntry>> calendarEntries = new java.util.HashMap<>();
+    private List<String> calendarFavoriteDays = new ArrayList<>();                 // iso list
+    private Map<String, String> calendarDayIcons = new java.util.HashMap<>();      // iso -> icon symbol
+    private Map<String, String> calendarDayIconColors = new java.util.HashMap<>(); // iso -> icon color
+
     private boolean showPriority = true;
     private boolean trackTime = false;
     private boolean showTaskType = false;
@@ -194,6 +204,114 @@ public class SectionConfig implements Serializable {
         if (taskId == null) return null;
         for (CalendarTask t : getCalendarTasks()) if (taskId.equals(t.getId())) return t;
         return null;
+    }
+
+    // --- Journal ---
+    public boolean isCalendarJournalEnabled() { return calendarJournalEnabled || calendarJournalOnly; }
+    public void setCalendarJournalEnabled(boolean v) { this.calendarJournalEnabled = v; }
+
+    public boolean isCalendarJournalOnly() { return calendarJournalOnly; }
+    public void setCalendarJournalOnly(boolean v) { this.calendarJournalOnly = v; }
+
+    /**
+     * iso date -> list of journal/event cards. Lazily migrates the legacy single-note map
+     * ({@code calendarJournal}) into journal entries on first access.
+     */
+    public Map<String, List<CalendarEntry>> getCalendarEntries() {
+        if (calendarEntries == null) calendarEntries = new java.util.HashMap<>();
+        if (calendarJournal != null && !calendarJournal.isEmpty()) {
+            for (Map.Entry<String, String> e : calendarJournal.entrySet()) {
+                if (e.getValue() == null || e.getValue().isBlank()) continue;
+                calendarEntries.computeIfAbsent(e.getKey(), k -> new ArrayList<>())
+                        .add(new CalendarEntry(false, e.getValue()));
+            }
+            calendarJournal.clear();
+        }
+        return calendarEntries;
+    }
+
+    public List<CalendarEntry> getDayEntries(String isoDate) {
+        List<CalendarEntry> list = getCalendarEntries().get(isoDate);
+        return list == null ? new ArrayList<>() : list;
+    }
+    public boolean hasDayEntries(String isoDate) {
+        List<CalendarEntry> list = getCalendarEntries().get(isoDate);
+        return list != null && !list.isEmpty();
+    }
+    public void addDayEntry(String isoDate, CalendarEntry entry) {
+        getCalendarEntries().computeIfAbsent(isoDate, k -> new ArrayList<>()).add(entry);
+    }
+    public void removeDayEntry(String isoDate, String entryId) {
+        List<CalendarEntry> list = getCalendarEntries().get(isoDate);
+        if (list == null) return;
+        list.removeIf(en -> en.getId().equals(entryId));
+        if (list.isEmpty()) getCalendarEntries().remove(isoDate);
+    }
+
+    /** True if the day has any non-event journal entry. */
+    public boolean hasDayNote(String isoDate) {
+        for (CalendarEntry e : getDayEntries(isoDate)) if (!e.isEvent()) return true;
+        return false;
+    }
+
+    // --- Single-note convenience for Task+Journal mode (at most one journal entry per day). ---
+    public CalendarEntry getSingleJournalEntry(String isoDate) {
+        for (CalendarEntry e : getDayEntries(isoDate)) if (!e.isEvent()) return e;
+        return null;
+    }
+    public String getDayNote(String isoDate) {
+        CalendarEntry e = getSingleJournalEntry(isoDate);
+        return e == null ? "" : e.getText();
+    }
+    public void setDayNote(String isoDate, String text) {
+        CalendarEntry existing = getSingleJournalEntry(isoDate);
+        if (text == null || text.isBlank()) {
+            if (existing != null) removeDayEntry(isoDate, existing.getId());
+            return;
+        }
+        if (existing != null) existing.setText(text);
+        else addDayEntry(isoDate, new CalendarEntry(false, text));
+    }
+
+    // --- Favorite days ---
+    public List<String> getCalendarFavoriteDays() {
+        if (calendarFavoriteDays == null) calendarFavoriteDays = new ArrayList<>();
+        return calendarFavoriteDays;
+    }
+    public boolean isFavoriteDay(String isoDate) { return getCalendarFavoriteDays().contains(isoDate); }
+    /** Toggles favorite state for a day. @return true if now favorited. */
+    public boolean toggleFavoriteDay(String isoDate) {
+        if (getCalendarFavoriteDays().remove(isoDate)) return false;
+        getCalendarFavoriteDays().add(isoDate);
+        return true;
+    }
+
+    // --- Per-day icons ---
+    public Map<String, String> getCalendarDayIcons() {
+        if (calendarDayIcons == null) calendarDayIcons = new java.util.HashMap<>();
+        return calendarDayIcons;
+    }
+    public Map<String, String> getCalendarDayIconColors() {
+        if (calendarDayIconColors == null) calendarDayIconColors = new java.util.HashMap<>();
+        return calendarDayIconColors;
+    }
+    public String getDayIcon(String isoDate) { return getCalendarDayIcons().get(isoDate); }
+    public boolean hasDayIcon(String isoDate) {
+        String s = getCalendarDayIcons().get(isoDate);
+        return s != null && !s.isBlank() && !s.equals("None");
+    }
+    public String getDayIconColor(String isoDate) {
+        String c = getCalendarDayIconColors().get(isoDate);
+        return c == null ? "#FFFFFF" : c;
+    }
+    public void setDayIcon(String isoDate, String symbol, String color) {
+        if (symbol == null || symbol.isBlank() || symbol.equals("None")) {
+            getCalendarDayIcons().remove(isoDate);
+            getCalendarDayIconColors().remove(isoDate);
+        } else {
+            getCalendarDayIcons().put(isoDate, symbol);
+            getCalendarDayIconColors().put(isoDate, color == null ? "#FFFFFF" : color);
+        }
     }
 
     public boolean isShowPriority() { return showPriority; }
