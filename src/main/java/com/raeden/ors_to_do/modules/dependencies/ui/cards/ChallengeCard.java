@@ -342,7 +342,14 @@ public class ChallengeCard extends VBox {
                 onUpdate.run();
             }
         });
-        contextMenu.getItems().addAll(editItem, new SeparatorMenuItem(), deleteItem);
+        contextMenu.getItems().add(editItem);
+
+        // "Move to Category" — only when this challenge's page has categories enabled.
+        Menu categoryMenu = com.raeden.ors_to_do.modules.dependencies.ui.menus.TaskContextMenu
+                .buildMoveToCategoryMenu(challengeTask, owningSection, globalDatabase, onUpdate);
+        if (categoryMenu != null) contextMenu.getItems().add(categoryMenu);
+
+        contextMenu.getItems().addAll(new SeparatorMenuItem(), deleteItem);
 
         this.setOnContextMenuRequested(e -> {
             if (isTimeLocked || completedFinal) {

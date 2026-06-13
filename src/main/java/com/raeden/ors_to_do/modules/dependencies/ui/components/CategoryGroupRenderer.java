@@ -68,6 +68,13 @@ public final class CategoryGroupRenderer {
         String sectionId = config.getId();
         Map<String, List<TaskItem>> grouped = groupByCategory(tasks);
 
+        // Include categories that have been explicitly created (have a style) but hold no tasks yet,
+        // so a freshly created empty category still renders and can receive cards.
+        for (CategoryStyle cs : config.getCategoryStyles()) {
+            String n = cs.getName();
+            if (n != null && !n.trim().isEmpty()) grouped.putIfAbsent(n.trim(), new ArrayList<>());
+        }
+
         for (Map.Entry<String, List<TaskItem>> entry : grouped.entrySet()) {
             String category = entry.getKey();
             List<TaskItem> bucket = entry.getValue();

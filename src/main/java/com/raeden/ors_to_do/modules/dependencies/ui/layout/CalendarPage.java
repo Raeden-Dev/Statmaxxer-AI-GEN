@@ -617,12 +617,15 @@ public class CalendarPage extends BorderPane {
 
         bottomTitle.setText(Lang.CAL_TASK_LIST_TITLE.get());
 
-        List<Region> cards = new ArrayList<>();
-        cards.add(buildAddCard());
-        for (CalendarTask t : config.getCalendarTasks()) cards.add(buildTaskCard(t));
+        boolean columnMode = config.isCalendarTaskColumnView();
 
-        if (config.isCalendarTaskColumnView()) {
-            // Grid layout: multiple cards per row, up to COLUMN_VIEW_COLS columns.
+        List<Region> cards = new ArrayList<>();
+        cards.add(buildAddCard(columnMode));
+        for (CalendarTask t : config.getCalendarTasks()) cards.add(buildTaskCard(t, columnMode));
+
+        if (columnMode) {
+            // Grid layout: multiple cards per row, up to COLUMN_VIEW_COLS columns. Cards are sized
+            // square (prefHeight follows the column width) so they read as tiles, not thin strips.
             GridPane tg = new GridPane();
             tg.setHgap(8);
             tg.setVgap(8);
@@ -636,6 +639,7 @@ public class CalendarPage extends BorderPane {
             for (int i = 0; i < cards.size(); i++) {
                 Region card = cards.get(i);
                 card.setMaxWidth(Double.MAX_VALUE);
+                card.prefHeightProperty().bind(card.widthProperty()); // square tiles
                 GridPane.setHgrow(card, Priority.ALWAYS);
                 tg.add(card, i % COLUMN_VIEW_COLS, i / COLUMN_VIEW_COLS);
             }
@@ -830,27 +834,24 @@ public class CalendarPage extends BorderPane {
         return cp;
     }
 
-    private Region buildAddCard() {
-        HBox card = new HBox(10);
+    private Region buildAddCard(boolean columnMode) {
+        StackPane card = new StackPane();
         card.setAlignment(Pos.CENTER);
         card.setPadding(new Insets(12));
         card.setStyle("-fx-background-color: #232323; -fx-border-color: #555555; -fx-border-style: segments(6, 6, 6, 6); -fx-border-radius: 6; -fx-background-radius: 6; -fx-cursor: hand;");
         Label plus = new Label(Lang.CAL_BTN_ADD_TASK.get());
+        plus.setWrapText(true);
         plus.setStyle("-fx-text-fill: #4EC9B0; -fx-font-weight: bold; -fx-font-size: 14px;");
         card.getChildren().add(plus);
         card.setOnMouseClicked(e -> showTaskEditDialog(null));
         return card;
     }
 
-    private Region buildTaskCard(CalendarTask t) {
+    private Region buildTaskCard(CalendarTask t, boolean columnMode) {
         boolean selected = brushTask != null && brushTask.getId().equals(t.getId());
 
-        HBox card = new HBox(12);
-        card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(10, 12, 10, 12));
         String base = "-fx-background-color: #2D2D30; -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-width: " + (selected ? 2 : 1)
                 + "; -fx-border-color: " + (selected ? t.getColorHex() : "#3E3E42") + "; -fx-cursor: hand;";
-        card.setStyle(base);
 
         StackPane swatch = new StackPane(new Circle(9, Color.web(t.getColorHex())));
         if (t.hasIcon()) {
@@ -860,19 +861,19 @@ public class CalendarPage extends BorderPane {
         }
 
         Label name = new Label(t.getName());
+        name.setWrapText(true);
+        name.setMaxWidth(Double.MAX_VALUE);
         name.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
         String summary = rewardSummary(t);
-        VBox textBox = new VBox(2, name);
+        Label sub = null;
         if (!summary.isEmpty()) {
-            Label sub = new Label(summary);
+            sub = new Label(summary);
+            sub.setWrapText(true);
             sub.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
-            textBox.getChildren().add(sub);
         }
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
         Button gear = new Button("⚙");
+        gear.setMinWidth(Region.USE_PREF_SIZE);
         gear.setStyle("-fx-background-color: transparent; -fx-text-fill: #AAAAAA; -fx-font-size: 15px; -fx-cursor: hand;");
         Tooltip.install(gear, new Tooltip(Lang.CAL_TOOLTIP_CONFIGURE_TASK.get()));
         gear.setOnAction(e -> showTaskEditDialog(t));
@@ -880,7 +881,36 @@ public class CalendarPage extends BorderPane {
         // button's ActionEvent fires on release, before the CLICKED event we consume here.
         gear.setOnMouseClicked(javafx.scene.input.MouseEvent::consume);
 
-        card.getChildren().addAll(swatch, textBox, spacer, gear);
+        Region card;
+        if (columnMode) {
+            // Square tile: swatch + gear on top, then the wrapping name/summary below so long
+            // names are never clipped and the gear is always visible.
+            Region topSpacer = new Region();
+            HBox.setHgrow(topSpacer, Priority.ALWAYS);
+            HBox topRow = new HBox(8, swatch, topSpacer, gear);
+            topRow.setAlignment(Pos.CENTER_LEFT);
+
+            VBox textBox = new VBox(2, name);
+            if (sub != null) textBox.getChildren().add(sub);
+
+            VBox tile = new VBox(8, topRow, textBox);
+            tile.setAlignment(Pos.TOP_LEFT);
+            tile.setPadding(new Insets(10));
+            tile.setStyle(base);
+            card = tile;
+        } else {
+            VBox textBox = new VBox(2, name);
+            if (sub != null) textBox.getChildren().add(sub);
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            HBox row = new HBox(12, swatch, textBox, spacer, gear);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(10, 12, 10, 12));
+            row.setStyle(base);
+            card = row;
+        }
 
         // Left-click selects the brush (click again to deselect). Right-click is reserved for the
         // context menu, so ignore any non-primary button here.

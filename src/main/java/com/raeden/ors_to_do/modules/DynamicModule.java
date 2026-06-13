@@ -94,9 +94,24 @@ public class DynamicModule extends StackPane {
                 }
                 if (!isTaskCard) bgMenu.show(scrollPane, e.getScreenX(), e.getScreenY());
             });
+            scrollPane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> { if (bgMenu.isShowing()) bgMenu.hide(); });
+        } else if ((config.isPerkPage() || config.isChallengePage()) && config.isEnableCategories()) {
+            // Perk/Challenge pages don't get the full task background menu, but when categories are
+            // enabled they still need the "Create New Category" action on the background.
+            ContextMenu catMenu = new ContextMenu();
+            catMenu.setStyle("-fx-background-color: #2D2D30; -fx-border-color: #555555;");
+            catMenu.getItems().add(DynamicContextMenu.buildCreateCategoryItem(config, appStats, this::refreshList));
+            scrollPane.setOnContextMenuRequested(e -> {
+                Node target = (Node) e.getTarget();
+                boolean isCard = false;
+                while (target != null) {
+                    if (target instanceof PerkCard || target instanceof ChallengeCard) { isCard = true; break; }
+                    target = target.getParent();
+                }
+                if (!isCard) catMenu.show(scrollPane, e.getScreenX(), e.getScreenY());
+            });
+            scrollPane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> { if (catMenu.isShowing()) catMenu.hide(); });
         }
-
-        scrollPane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> { if (bgMenu.isShowing()) bgMenu.hide(); });
 
         if (!config.isStatPage()) {
             // Challenge-page flagging happens inside DynamicInputPanel.addTask itself, so a plain
@@ -168,7 +183,7 @@ public class DynamicModule extends StackPane {
         DynamicSortHelper.sortTasks(tasksToDisplay, filterSortHeader.getSortMode(), config, appStats);
         filterSortHeader.updateBadges(availableCount, completedCount);
 
-        if (tasksToDisplay.isEmpty()) {
+        if (tasksToDisplay.isEmpty() && !(config.isEnableCategories() && !config.getCategoryStyles().isEmpty())) {
             String emptyText = config.isNotesPage() ? Lang.EMPTY_NOTES.get() : (config.isRewardsPage() ? Lang.EMPTY_REWARDS.get() : Lang.EMPTY_TASKS.get());
             Label emptyLabel = new Label(emptyText);
             emptyLabel.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
@@ -255,7 +270,7 @@ public class DynamicModule extends StackPane {
 
         DynamicSortHelper.sortTasks(perks, filterSortHeader.getSortMode(), config, appStats);
 
-        if (perks.isEmpty()) {
+        if (perks.isEmpty() && !(config.isEnableCategories() && !config.getCategoryStyles().isEmpty())) {
             Label emptyMsg = new Label(Lang.EMPTY_PERKS.get());
             emptyMsg.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);
@@ -288,7 +303,7 @@ public class DynamicModule extends StackPane {
 
         DynamicSortHelper.sortTasks(challenges, filterSortHeader.getSortMode(), config, appStats);
 
-        if (challenges.isEmpty()) {
+        if (challenges.isEmpty() && !(config.isEnableCategories() && !config.getCategoryStyles().isEmpty())) {
             Label emptyMsg = new Label(Lang.EMPTY_CHALLENGES.get());
             emptyMsg.setStyle("-fx-text-fill: #555555; -fx-font-size: 16px; -fx-font-style: italic; -fx-padding: 30 0 0 0;");
             emptyMsg.setMaxWidth(Double.MAX_VALUE); emptyMsg.setAlignment(Pos.CENTER);

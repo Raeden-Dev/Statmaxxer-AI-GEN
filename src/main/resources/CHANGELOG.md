@@ -17,10 +17,12 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 - **Move to Category context-menu submenu.** When a page has **Enable Categories** on, every card's
   right-click menu gains a **"Move to Category"** submenu listing all categories available on that
   page (used by tasks or defined as styles), with the card's current category pre-selected, plus a
-  **"Set as Uncategorized"** option.
+  **"Set as Uncategorized"** option. Works on normal task cards as well as **perk and challenge
+  cards** (which group by category too).
 - **Calendar Task List view modes.** A **Per Row / Per Column** selector in the Task List header.
-  *Per Column* lays the task cards out in a grid (up to 5 per row); *Per Row* keeps the single-column
-  list. The choice is remembered per calendar page.
+  *Per Column* lays the task cards out in a grid (up to 5 per row) as **square tiles** — the task
+  name wraps instead of being cut off and the ⚙ gear is pinned to the tile's top-right; *Per Row*
+  keeps the single-column list. The choice is remembered per calendar page.
 - **Drag-to-reorder calendar task cards.** Drag a task card onto another to reorder the Task List;
   works in both the Per Row and Per Column layouts.
 

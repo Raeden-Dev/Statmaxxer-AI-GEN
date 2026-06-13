@@ -181,7 +181,15 @@ public class PerkCard extends VBox {
                 onUpdate.run();
             }
         });
-        contextMenu.getItems().addAll(editItem, new SeparatorMenuItem(), deleteItem);
+        contextMenu.getItems().add(editItem);
+
+        // "Move to Category" — only when this perk's page has categories enabled.
+        com.raeden.ors_to_do.dependencies.models.SectionConfig perkSection = appStats.findSection(perkTask.getSectionId());
+        Menu categoryMenu = com.raeden.ors_to_do.modules.dependencies.ui.menus.TaskContextMenu
+                .buildMoveToCategoryMenu(perkTask, perkSection, globalDatabase, onUpdate);
+        if (categoryMenu != null) contextMenu.getItems().add(categoryMenu);
+
+        contextMenu.getItems().addAll(new SeparatorMenuItem(), deleteItem);
 
         this.setOnContextMenuRequested(e -> {
             contextMenu.show(this, e.getScreenX(), e.getScreenY());

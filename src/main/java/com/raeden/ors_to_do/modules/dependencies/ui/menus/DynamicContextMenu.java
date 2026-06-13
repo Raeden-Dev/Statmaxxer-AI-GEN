@@ -9,6 +9,7 @@ import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextInputDialog;
 
 import java.util.List;
 
@@ -37,6 +38,11 @@ public class DynamicContextMenu {
             bgMenu.getItems().add(createOptItem);
         }
 
+        if (config.isEnableCategories()) {
+            bgMenu.getItems().add(new SeparatorMenuItem());
+            bgMenu.getItems().add(buildCreateCategoryItem(config, appStats, refreshListAction));
+        }
+
         if (appStats.isEnableTextToTask() && !config.isNotesPage()) {
             bgMenu.getItems().add(new SeparatorMenuItem());
             MenuItem batchItem = new MenuItem("Batch to Task");
@@ -51,6 +57,32 @@ public class DynamicContextMenu {
             bgMenu.getItems().add(batchItem);
         }
         return bgMenu;
+    }
+
+    /**
+     * Builds the "Create New Category" background-menu item. Prompts for a name and registers it as
+     * a (default-styled) category on the section via {@link SectionConfig#upsertCategoryStyle},
+     * which makes the empty category render immediately so cards can be moved into it. Shared by the
+     * normal background menu and the perk/challenge background menu.
+     */
+    public static MenuItem buildCreateCategoryItem(SectionConfig config, AppStats appStats, Runnable refresh) {
+        MenuItem item = new MenuItem("Create New Category");
+        item.setStyle("-fx-text-fill: #DCDCAA; -fx-font-weight: bold;");
+        item.setOnAction(e -> {
+            TextInputDialog dlg = new TextInputDialog();
+            dlg.setTitle("Create New Category");
+            dlg.setHeaderText("Enter a name for the new category:");
+            dlg.setContentText("Category name:");
+            TaskDialogs.styleDialog(dlg);
+            dlg.showAndWait().ifPresent(name -> {
+                String trimmed = name == null ? "" : name.trim();
+                if (trimmed.isEmpty()) return;
+                config.upsertCategoryStyle(trimmed); // registers the category (no-op if it exists)
+                StorageManager.saveStats(appStats);
+                if (refresh != null) refresh.run();
+            });
+        });
+        return item;
     }
 
     private static void createAndEditTask(boolean isLink, boolean isOptional, SectionConfig config, AppStats appStats, List<TaskItem> db, Runnable refresh, Runnable sync) {

@@ -207,52 +207,7 @@ public class TaskContextMenu {
         }
 
         // --- Move to Category (only when this page has categories enabled) ---
-        Menu categoryMenu = null;
-        if (config != null && config.isEnableCategories()) {
-            categoryMenu = new Menu("Move to Category");
-
-            // Gather every category available on this page: styled categories plus any
-            // categoryName already in use by tasks belonging to this section.
-            java.util.LinkedHashSet<String> categories = new java.util.LinkedHashSet<>();
-            for (CategoryStyle cs : config.getCategoryStyles()) {
-                if (cs.getName() != null && !cs.getName().trim().isEmpty()) categories.add(cs.getName().trim());
-            }
-            if (globalDatabase != null) {
-                for (TaskItem other : globalDatabase) {
-                    if (!config.getId().equals(other.getSectionId())) continue;
-                    String c = other.getCategoryName();
-                    if (c != null && !c.trim().isEmpty()) categories.add(c.trim());
-                }
-            }
-            java.util.List<String> sortedCategories = new java.util.ArrayList<>(categories);
-            sortedCategories.sort(String.CASE_INSENSITIVE_ORDER);
-
-            String currentCategory = task.getCategoryName();
-            ToggleGroup categoryGroup = new ToggleGroup();
-
-            for (String cat : sortedCategories) {
-                RadioMenuItem catItem = new RadioMenuItem(cat);
-                catItem.setToggleGroup(categoryGroup);
-                catItem.setSelected(cat.equals(currentCategory));
-                catItem.setOnAction(e -> {
-                    task.setCategoryName(cat);
-                    StorageManager.saveTasks(globalDatabase);
-                    onUpdate.run();
-                });
-                categoryMenu.getItems().add(catItem);
-            }
-            if (!sortedCategories.isEmpty()) categoryMenu.getItems().add(new SeparatorMenuItem());
-
-            RadioMenuItem uncategorizedItem = new RadioMenuItem("Set as Uncategorized");
-            uncategorizedItem.setToggleGroup(categoryGroup);
-            uncategorizedItem.setSelected(currentCategory == null || currentCategory.trim().isEmpty());
-            uncategorizedItem.setOnAction(e -> {
-                task.setCategoryName(null);
-                StorageManager.saveTasks(globalDatabase);
-                onUpdate.run();
-            });
-            categoryMenu.getItems().add(uncategorizedItem);
-        }
+        Menu categoryMenu = buildMoveToCategoryMenu(task, config, globalDatabase, onUpdate);
 
         MenuItem toggleFavoriteItem = new MenuItem(task.isFavorite() ? "Remove Favorite" : "Favorite Task");
         if (config != null && !config.isAllowFavorite()) toggleFavoriteItem.setDisable(true);
@@ -354,5 +309,62 @@ public class TaskContextMenu {
         });
 
         return contextMenu;
+    }
+
+    /**
+     * Builds the "Move to Category" submenu for {@code task}, listing every category available on
+     * its page (categories used by tasks in the section plus any defined styles), with the card's
+     * current category pre-selected and a "Set as Uncategorized" option. Returns {@code null} when
+     * the section is missing or doesn't have categories enabled, so callers can simply skip adding
+     * it. Shared by normal task cards and the specialized perk/challenge cards.
+     */
+    public static Menu buildMoveToCategoryMenu(TaskItem task, SectionConfig config, List<TaskItem> globalDatabase, Runnable onUpdate) {
+        if (config == null || !config.isEnableCategories()) return null;
+
+        Menu categoryMenu = new Menu("Move to Category");
+
+        // Gather every category available on this page: styled categories plus any categoryName
+        // already in use by tasks belonging to this section.
+        java.util.LinkedHashSet<String> categories = new java.util.LinkedHashSet<>();
+        for (CategoryStyle cs : config.getCategoryStyles()) {
+            if (cs.getName() != null && !cs.getName().trim().isEmpty()) categories.add(cs.getName().trim());
+        }
+        if (globalDatabase != null) {
+            for (TaskItem other : globalDatabase) {
+                if (!config.getId().equals(other.getSectionId())) continue;
+                String c = other.getCategoryName();
+                if (c != null && !c.trim().isEmpty()) categories.add(c.trim());
+            }
+        }
+        java.util.List<String> sortedCategories = new java.util.ArrayList<>(categories);
+        sortedCategories.sort(String.CASE_INSENSITIVE_ORDER);
+
+        String currentCategory = task.getCategoryName();
+        ToggleGroup categoryGroup = new ToggleGroup();
+
+        for (String cat : sortedCategories) {
+            RadioMenuItem catItem = new RadioMenuItem(cat);
+            catItem.setToggleGroup(categoryGroup);
+            catItem.setSelected(cat.equals(currentCategory));
+            catItem.setOnAction(e -> {
+                task.setCategoryName(cat);
+                StorageManager.saveTasks(globalDatabase);
+                onUpdate.run();
+            });
+            categoryMenu.getItems().add(catItem);
+        }
+        if (!sortedCategories.isEmpty()) categoryMenu.getItems().add(new SeparatorMenuItem());
+
+        RadioMenuItem uncategorizedItem = new RadioMenuItem("Set as Uncategorized");
+        uncategorizedItem.setToggleGroup(categoryGroup);
+        uncategorizedItem.setSelected(currentCategory == null || currentCategory.trim().isEmpty());
+        uncategorizedItem.setOnAction(e -> {
+            task.setCategoryName(null);
+            StorageManager.saveTasks(globalDatabase);
+            onUpdate.run();
+        });
+        categoryMenu.getItems().add(uncategorizedItem);
+
+        return categoryMenu;
     }
 }
