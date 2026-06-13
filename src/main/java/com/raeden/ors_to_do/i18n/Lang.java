@@ -193,6 +193,7 @@ public enum Lang {
     CAL_HINT_SELECT_TASK("Select a task card below first, then click a day to mark it."),
     CAL_HINT_TODAY_ONLY("This calendar only allows marking today. Enable \"Allow Calendar Manipulation\" in Edit Section to change other days."),
     CAL_HINT_MARKING_WITH("Marking with \"{0}\" — click a day above."),
+    CAL_HINT_DOUBLE_CLICK_JOURNAL("Double-click a day to open its journal."),
     CAL_JOURNAL_CLICK_DAY_HINT("Click a day above to view, add, or edit its journal entries and events."),
     CAL_NO_ENTRIES_FOR_DAY("No entries for this day yet. Add a journal entry or an event."),
     CAL_MENU_VIEW_ADD_ENTRIES("View / Add Entries"),

@@ -98,6 +98,34 @@ public class TaskEditDialog {
         grid.add(repeatingTaskCheck, 0, rowIdx.get());
         grid.add(repBox, 1, rowIdx.getAndIncrement());
 
+        // --- NEW: Description Card toggle + copied content (only when the section opts in) ---
+        boolean sectionAllowsDescription = config != null && config.isEnableDescriptionCards();
+        CheckBox descCardCheck = new CheckBox("Is Description Card?");
+        descCardCheck.setStyle("-fx-text-fill: #DCDCAA; -fx-font-weight: bold;");
+        TextArea descContentField = new TextArea(task.getDescriptionContent());
+        descContentField.setWrapText(true);
+        descContentField.setPrefRowCount(4);
+        descContentField.setMaxWidth(Double.MAX_VALUE);
+        descContentField.setPromptText("Text copied to the clipboard when the card's Copy button is clicked.");
+
+        if (task.isLinkCard() || hasSubTasks || task.isRepeatingMode()) {
+            descCardCheck.setDisable(true);
+            descCardCheck.setSelected(false);
+        } else {
+            descCardCheck.setSelected(task.isDescriptionCard());
+        }
+        descContentField.setDisable(!descCardCheck.isSelected());
+
+        if (sectionAllowsDescription) {
+            grid.add(descCardCheck, 0, rowIdx.get());
+            grid.add(descContentField, 1, rowIdx.getAndIncrement());
+            // If the task is already a description card, the mutually-exclusive modes start locked.
+            if (descCardCheck.isSelected()) {
+                linkCardCheck.setSelected(false); linkCardCheck.setDisable(true);
+                repeatingTaskCheck.setSelected(false); repeatingTaskCheck.setDisable(true); repBox.setVisible(false);
+            }
+        }
+
         // --- NEW: Category field (only shown when the section opts in via "Enable Categories") ---
         TextField categoryField = null;
         if (config != null && config.isEnableCategories()) {
@@ -127,14 +155,17 @@ public class TaskEditDialog {
         }
         final TextField categoryFieldFinal = categoryField;
 
-        // Ensure Mutually Exclusive Link vs Repeating Logic
+        // Ensure Mutually Exclusive Link vs Repeating vs Description Logic
         linkCardCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
                 repeatingTaskCheck.setSelected(false);
                 repeatingTaskCheck.setDisable(true);
                 repBox.setVisible(false);
-            } else if (sectionAllowsRepeating && !hasSubTasks) {
-                repeatingTaskCheck.setDisable(false);
+                descCardCheck.setSelected(false);
+                descCardCheck.setDisable(true);
+            } else {
+                if (sectionAllowsRepeating && !hasSubTasks) repeatingTaskCheck.setDisable(false);
+                if (sectionAllowsDescription && !hasSubTasks) descCardCheck.setDisable(false);
             }
         });
 
@@ -143,8 +174,22 @@ public class TaskEditDialog {
             if (newVal) {
                 linkCardCheck.setSelected(false);
                 linkCardCheck.setDisable(true);
-            } else if (sectionAllowsLinks && !hasSubTasks && !task.isOptional()) {
-                linkCardCheck.setDisable(false);
+                descCardCheck.setSelected(false);
+                descCardCheck.setDisable(true);
+            } else {
+                if (sectionAllowsLinks && !hasSubTasks && !task.isOptional()) linkCardCheck.setDisable(false);
+                if (sectionAllowsDescription && !hasSubTasks) descCardCheck.setDisable(false);
+            }
+        });
+
+        descCardCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            descContentField.setDisable(!newVal);
+            if (newVal) {
+                linkCardCheck.setSelected(false); linkCardCheck.setDisable(true);
+                repeatingTaskCheck.setSelected(false); repeatingTaskCheck.setDisable(true); repBox.setVisible(false);
+            } else {
+                if (sectionAllowsLinks && !hasSubTasks && !task.isOptional()) linkCardCheck.setDisable(false);
+                if (sectionAllowsRepeating && !hasSubTasks) repeatingTaskCheck.setDisable(false);
             }
         });
 
@@ -202,6 +247,11 @@ public class TaskEditDialog {
 
                 if (repeatingTaskCheck.isSelected()) {
                     task.setRepetitionCount(repCounterSpinner.getValue());
+                }
+
+                if (sectionAllowsDescription) {
+                    task.setDescriptionCard(descCardCheck.isSelected());
+                    task.setDescriptionContent(descContentField.getText() == null ? "" : descContentField.getText());
                 }
 
                 if (categoryFieldFinal != null) {

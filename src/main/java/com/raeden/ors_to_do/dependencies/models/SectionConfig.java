@@ -37,6 +37,8 @@ public class SectionConfig implements Serializable {
     private boolean calendarShowDots = true;        // colour dots under the date number
     private boolean allowCalendarManipulation = false; // mark past/future days, not just "today"
     private boolean calendarGrantsXp = false;        // award Custom Stats XP on completion
+    /** Task-List card layout: "ROW" (one card per row) or "COLUMN" (grid, up to 5 per row). */
+    private String calendarTaskViewMode = "ROW";
     private List<CalendarTask> calendarTasks = new ArrayList<>();
     /** ISO date string ("yyyy-MM-dd") -> list of CalendarTask ids completed that day. */
     private Map<String, List<String>> calendarCompletions = new java.util.HashMap<>();
@@ -62,6 +64,7 @@ public class SectionConfig implements Serializable {
     private boolean enableZenMode = true;
     private boolean enableStatsSystem = false;
     private boolean enableLinkCards = false;
+    private boolean enableDescriptionCards = false;
 
     private boolean isNotesPage = false;
 
@@ -166,6 +169,10 @@ public class SectionConfig implements Serializable {
 
     public boolean isCalendarGrantsXp() { return calendarGrantsXp; }
     public void setCalendarGrantsXp(boolean v) { this.calendarGrantsXp = v; }
+
+    public String getCalendarTaskViewMode() { return "COLUMN".equals(calendarTaskViewMode) ? "COLUMN" : "ROW"; }
+    public void setCalendarTaskViewMode(String mode) { this.calendarTaskViewMode = "COLUMN".equals(mode) ? "COLUMN" : "ROW"; }
+    public boolean isCalendarTaskColumnView() { return "COLUMN".equals(calendarTaskViewMode); }
 
     public List<CalendarTask> getCalendarTasks() {
         if (calendarTasks == null) calendarTasks = new ArrayList<>();
@@ -360,6 +367,9 @@ public class SectionConfig implements Serializable {
 
     public boolean isEnableLinkCards() { return enableLinkCards; }
     public void setEnableLinkCards(boolean enableLinkCards) { this.enableLinkCards = enableLinkCards; }
+
+    public boolean isEnableDescriptionCards() { return enableDescriptionCards; }
+    public void setEnableDescriptionCards(boolean enableDescriptionCards) { this.enableDescriptionCards = enableDescriptionCards; }
 
     public boolean isNotesPage() { return isNotesPage; }
     public void setNotesPage(boolean notesPage) { this.isNotesPage = notesPage; }

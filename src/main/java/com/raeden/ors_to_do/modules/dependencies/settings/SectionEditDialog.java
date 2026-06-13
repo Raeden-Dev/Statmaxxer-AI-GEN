@@ -153,6 +153,7 @@ public class SectionEditDialog {
         CheckBox enableIconsCheck = new CheckBox("Enable Task Icons"); enableIconsCheck.setSelected(config.isEnableIcons());
         CheckBox enableOptionalTasksCheck = new CheckBox("Enable Optional Tasks"); enableOptionalTasksCheck.setSelected(config.isEnableOptionalTasks());
         CheckBox enableLinkCardsCheck = new CheckBox("Enable Link Cards"); enableLinkCardsCheck.setSelected(config.isEnableLinkCards());
+        CheckBox enableDescriptionCardsCheck = new CheckBox("Enable Description Cards"); enableDescriptionCardsCheck.setSelected(config.isEnableDescriptionCards());
         CheckBox allowRepeatingTasksCheck = new CheckBox("Allow Repeating Tasks"); allowRepeatingTasksCheck.setSelected(config.isAllowRepeatingTasks());
 
         // --- NEW: Lock Task Checkbox ---
@@ -174,6 +175,7 @@ public class SectionEditDialog {
         featuresGrid.add(createToggle(enableTaskStylingCheck, "Allows custom background and outline colors for individual tasks."), 0, 9);
         featuresGrid.add(createToggle(enableTimedTasksCheck, "Tasks require specific focus time to complete."), 0, 10);
         featuresGrid.add(createToggle(lockCompletedCheck, "Disables un-checking or editing tasks once completed."), 0, 11);
+        featuresGrid.add(createToggle(enableDescriptionCardsCheck, "Allows cards that show a Copy button (instead of a checkbox) which copies their description text."), 0, 12);
 
         featuresGrid.add(createToggle(streakCheck, "Tracks consecutive completions. Requires a reset interval."), 1, 0);
         featuresGrid.add(createToggle(autoArchiveCheck, "Tasks are sent to archive the moment they are checked off."), 1, 1);
@@ -230,11 +232,17 @@ public class SectionEditDialog {
             CheckBox[] matrixToggles = { allowManualArchiveCheck, showDateCheck, showPrefixCheck, showTagsCheck,
                     enableScoreCheck, enableLinksCheck, enableStatsSystemCheck, enableTaskStylingCheck,
                     lockCompletedCheck, showTaskTypeCheck, favoriteCheck, showAnalyticsCheck,
-                    enableIconsCheck, enableCategoriesCheck };
+                    enableIconsCheck, enableCategoriesCheck, enableDescriptionCardsCheck };
             for (CheckBox cb : matrixToggles) cb.setDisable(false);
             preventEditingSpinner.setDisable(false);
 
             java.util.function.Consumer<CheckBox> off = cb -> { cb.setDisable(true); cb.setSelected(false); };
+
+            // Description cards replace the checkbox with a Copy button on a normal task card, so
+            // they're incompatible with pages that don't render a normal checkbox: rewards (Buy
+            // button), perk/challenge (specialized cards), and calendar/stat (no task cards). They
+            // are allowed on normal pages and notes pages.
+            if (isReward || isPerk || isChallenge) off.accept(enableDescriptionCardsCheck);
 
             if (isCalendar || isStat) {
                 // Calendar and Stat pages render no task cards — every task feature is inert.
@@ -289,7 +297,8 @@ public class SectionEditDialog {
                 showTaskTypeCheck.setSelected(p.isShowTaskType()); favoriteCheck.setSelected(p.isAllowFavorite());
                 showAnalyticsCheck.setSelected(p.isShowAnalytics()); enableIconsCheck.setSelected(p.isEnableIcons());
                 enableZenModeCheck.setSelected(p.isEnableZenMode()); enableStatsSystemCheck.setSelected(p.isEnableStatsSystem());
-                enableLinkCardsCheck.setSelected(p.isEnableLinkCards()); notesPageCheck.setSelected(p.isNotesPage());
+                enableLinkCardsCheck.setSelected(p.isEnableLinkCards()); enableDescriptionCardsCheck.setSelected(p.isEnableDescriptionCards());
+                notesPageCheck.setSelected(p.isNotesPage());
                 statPageCheck.setSelected(p.isStatPage()); perkPageCheck.setSelected(p.isPerkPage());
                 challengePageCheck.setSelected(p.isChallengePage());
                 calendarPageCheck.setSelected(p.isCalendarPage());
@@ -324,7 +333,8 @@ public class SectionEditDialog {
                 newPreset.setShowTaskType(showTaskTypeCheck.isSelected()); newPreset.setAllowFavorite(favoriteCheck.isSelected());
                 newPreset.setShowAnalytics(showAnalyticsCheck.isSelected()); newPreset.setEnableIcons(enableIconsCheck.isSelected());
                 newPreset.setEnableZenMode(enableZenModeCheck.isSelected()); newPreset.setEnableStatsSystem(enableStatsSystemCheck.isSelected());
-                newPreset.setEnableLinkCards(enableLinkCardsCheck.isSelected()); newPreset.setNotesPage(notesPageCheck.isSelected());
+                newPreset.setEnableLinkCards(enableLinkCardsCheck.isSelected()); newPreset.setEnableDescriptionCards(enableDescriptionCardsCheck.isSelected());
+                newPreset.setNotesPage(notesPageCheck.isSelected());
                 newPreset.setStatPage(statPageCheck.isSelected()); newPreset.setPerkPage(perkPageCheck.isSelected());
                 newPreset.setChallengePage(challengePageCheck.isSelected());
                 newPreset.setCalendarPage(calendarPageCheck.isSelected());
@@ -383,6 +393,7 @@ public class SectionEditDialog {
                 config.setAllowFavorite(favoriteCheck.isSelected()); config.setShowAnalytics(showAnalyticsCheck.isSelected());
                 config.setEnableIcons(enableIconsCheck.isSelected()); config.setEnableZenMode(enableZenModeCheck.isSelected());
                 config.setEnableStatsSystem(enableStatsSystemCheck.isSelected()); config.setEnableLinkCards(enableLinkCardsCheck.isSelected());
+                config.setEnableDescriptionCards(enableDescriptionCardsCheck.isSelected());
                 config.setNotesPage(notesPageCheck.isSelected()); config.setEnableOptionalTasks(enableOptionalTasksCheck.isSelected());
                 config.setEnableTaskStyling(enableTaskStylingCheck.isSelected()); config.setEnableTimedTasks(enableTimedTasksCheck.isSelected());
                 config.setAllowRepeatingTasks(allowRepeatingTasksCheck.isSelected());

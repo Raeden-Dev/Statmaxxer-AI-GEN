@@ -132,6 +132,10 @@ public class TaskActionHandler {
                 appStats.setGlobalScore(appStats.getGlobalScore() - task.getCostPoints());
                 appStats.setLifetimePointsSpent(appStats.getLifetimePointsSpent() + task.getCostPoints());
                 appStats.setRewardsClaimed(appStats.getRewardsClaimed() + 1);
+                if (task.getCostPoints() != 0) {
+                    appStats.recordStatChange(StatLedgerEntry.GLOBAL_SCORE, -task.getCostPoints(), "pts",
+                            "Bought: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Reward" : task.getTextContent()));
+                }
 
                 if (task.isCounterMode()) {
                     task.setCurrentCount(task.getCurrentCount() + 1);
@@ -243,6 +247,10 @@ public class TaskActionHandler {
             applyInflictedDebuffs(task, appStats);
 
             appStats.setGlobalScore(appStats.getGlobalScore() + task.getRewardPoints());
+            if (task.getRewardPoints() != 0) {
+                appStats.recordStatChange(StatLedgerEntry.GLOBAL_SCORE, task.getRewardPoints(), "pts",
+                        task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent());
+            }
             if (config.isEnableStatsSystem()) {
                 processRPGStats(task, appStats, true);
             }
@@ -276,12 +284,18 @@ public class TaskActionHandler {
         task.setPenaltyApplied(true);
         appStats.setGlobalScore(appStats.getGlobalScore() - task.getPenaltyPoints());
 
+        String missSource = "Missed: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent());
+        if (task.getPenaltyPoints() != 0) {
+            appStats.recordStatChange(StatLedgerEntry.GLOBAL_SCORE, -task.getPenaltyPoints(), "pts", missSource);
+        }
+
         if (hasStatPenalties && appStats.isGlobalStatsEnabled()) {
             for (CustomStat stat : appStats.getCustomStats()) {
                 int pen = getStatValue(task.getStatPenalties(), stat);
                 if (pen > 0) {
                     stat.drain(pen, stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
                     stat.setLifetimeLost(stat.getLifetimeLost() + pen);
+                    appStats.recordStatChange(stat.getName(), -pen, stat.isUseExp() ? "XP" : "pts", missSource);
                 }
             }
         }
@@ -322,10 +336,14 @@ public class TaskActionHandler {
             }
             effectiveCap = Math.max(1, effectiveCap);
 
+            String ledgerUnit = stat.isUseExp() ? "XP" : "pts";
+            String baseSource = task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent();
+
             if (isCompletion) {
                 if (capAmt > 0 && stat.getMaxCap() > 0) {
                     stat.setMaxCap(stat.getMaxCap() + capAmt);
                     effectiveCap += capAmt;
+                    appStats.recordStatChange(stat.getName(), capAmt, "Max Cap", baseSource);
                 }
 
                 if (rewardAmt > 0) {
@@ -334,26 +352,32 @@ public class TaskActionHandler {
                     stat.gain(rewardAmt, effectiveCap);
                     stat.setLifetimeEarned(stat.getLifetimeEarned() + rewardAmt);
                     appStats.getLastStatGainDates().put(stat.getId(), java.time.LocalDate.now());
+                    appStats.recordStatChange(stat.getName(), rewardAmt, ledgerUnit, baseSource);
                 }
 
                 if (costAmt > 0) {
                     stat.drain(costAmt, effectiveCap);
                     stat.setLifetimeLost(stat.getLifetimeLost() + costAmt);
+                    appStats.recordStatChange(stat.getName(), -costAmt, ledgerUnit, baseSource);
                 }
 
             } else {
+                String revSource = "Reverted: " + baseSource;
                 if (rewardAmt > 0) {
                     stat.drain(rewardAmt, effectiveCap);
                     stat.setLifetimeLost(stat.getLifetimeLost() + rewardAmt);
+                    appStats.recordStatChange(stat.getName(), -rewardAmt, ledgerUnit, revSource);
                 }
 
                 if (costAmt > 0) {
                     stat.gain(costAmt, effectiveCap);
+                    appStats.recordStatChange(stat.getName(), costAmt, ledgerUnit, revSource);
                 }
 
                 if (capAmt > 0 && stat.getMaxCap() > 0) {
                     stat.setMaxCap(Math.max(1, stat.getMaxCap() - capAmt));
                     effectiveCap = Math.max(1, effectiveCap - capAmt);
+                    appStats.recordStatChange(stat.getName(), -capAmt, "Max Cap", revSource);
 
                     if (stat.getCurrentAmount() > effectiveCap) {
                         stat.setCurrentAmount(effectiveCap);

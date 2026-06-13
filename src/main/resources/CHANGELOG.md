@@ -5,6 +5,36 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 
 ---
 
+## v1.472 — 2026-06-14
+
+### Added
+- **Description Card (new card type).** Enable **"Enable Description Cards"** in *Edit Section* on a
+  compatible page, then toggle **"Is Description Card?"** in a card's edit dialog and give it a body
+  of text. The card replaces its checkbox with a **📋 Copy** button that copies that text to the
+  clipboard (with a brief "✓ Copied" confirmation). Mutually exclusive with Link and Repeating
+  cards. The section toggle is blocked on incompatible pages (Rewards, Stat/Perk/Challenge,
+  Calendar); allowed on normal and notes pages.
+- **Move to Category context-menu submenu.** When a page has **Enable Categories** on, every card's
+  right-click menu gains a **"Move to Category"** submenu listing all categories available on that
+  page (used by tasks or defined as styles), with the card's current category pre-selected, plus a
+  **"Set as Uncategorized"** option.
+- **Calendar Task List view modes.** A **Per Row / Per Column** selector in the Task List header.
+  *Per Column* lays the task cards out in a grid (up to 5 per row); *Per Row* keeps the single-column
+  list. The choice is remembered per calendar page.
+- **Drag-to-reorder calendar task cards.** Drag a task card onto another to reorder the Task List;
+  works in both the Per Row and Per Column layouts.
+
+### Changed
+- **Stat-page History is now a live ledger.** The 📖 History dialog shows a chronological log of every
+  actual Custom Stat / Global Score point/EXP/cap change *and its source* (task completion, miss
+  penalty, reward purchase, calendar mark, focus session, daily atrophy, and reversals), newest
+  first with colour-coded badges — instead of re-deriving "history" from task cards. The ledger is
+  recorded going forward and capped to the 300 most recent entries; it is empty until new stat
+  changes occur after upgrading.
+- **Calendar journal opens on double-click.** In Task+Journal mode (with no task brush selected), a
+  day's journal now opens on a **double-click** instead of a single click; a single click shows a
+  hint. Journal-Only mode still selects a day on a single click.
+
 ## v1.465 — 2026-06-10
 
 ### Added

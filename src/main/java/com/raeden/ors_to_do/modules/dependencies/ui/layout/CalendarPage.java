@@ -56,6 +56,12 @@ public class CalendarPage extends BorderPane {
     private final VBox taskListBox = new VBox(8);
     private final Label bottomTitle = new Label();
     private final ComboBox<CalendarTask> filterBox = new ComboBox<>();
+    private final ComboBox<String> viewModeBox = new ComboBox<>();
+    private final HBox bottomHeader = new HBox(10);
+
+    private static final String VIEW_PER_ROW = "Per Row";
+    private static final String VIEW_PER_COLUMN = "Per Column";
+    private static final int COLUMN_VIEW_COLS = 5;
 
     /** Special filter entry (identity-compared) that shows only favorited days. */
     private static final CalendarTask FAVORITES_SENTINEL = new CalendarTask(Lang.CAL_FILTER_FAVORITES.get());
@@ -168,7 +174,21 @@ public class CalendarPage extends BorderPane {
 
         bottomTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
 
-        VBox content = new VBox(14, grid, new Separator(), bottomTitle, taskListBox);
+        // Task-List header: title on the left, the Per Row / Per Column view selector on the right.
+        viewModeBox.getItems().setAll(VIEW_PER_ROW, VIEW_PER_COLUMN);
+        viewModeBox.setValue(config.isCalendarTaskColumnView() ? VIEW_PER_COLUMN : VIEW_PER_ROW);
+        viewModeBox.getStylesheets().add(css(COMBO_CSS));
+        viewModeBox.setOnAction(e -> {
+            config.setCalendarTaskViewMode(VIEW_PER_COLUMN.equals(viewModeBox.getValue()) ? "COLUMN" : "ROW");
+            StorageManager.saveStats(appStats);
+            renderTaskList();
+        });
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        bottomHeader.setAlignment(Pos.CENTER_LEFT);
+        bottomHeader.getChildren().addAll(bottomTitle, headerSpacer, viewModeBox);
+
+        VBox content = new VBox(14, grid, new Separator(), bottomHeader, taskListBox);
         content.setPadding(new Insets(10, 0, 10, 0));
 
         ScrollPane sp = new ScrollPane(content);
@@ -284,7 +304,7 @@ public class CalendarPage extends BorderPane {
         final String hover = base + " -fx-effect: dropshadow(gaussian, rgba(86,156,214,0.5), 6, 0, 0, 0);";
         cell.setOnMouseEntered(e -> cell.setStyle(hover));
         cell.setOnMouseExited(e -> cell.setStyle(base));
-        cell.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) onDayClicked(date); });
+        cell.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) onDayClicked(date, e.getClickCount()); });
         cell.setOnContextMenuRequested(e -> buildDayMenu(date).show(cell, e.getScreenX(), e.getScreenY()));
         return cell;
     }
@@ -349,7 +369,7 @@ public class CalendarPage extends BorderPane {
 
     // ------------------------------------------------------------------ interaction & rewards
 
-    private void onDayClicked(LocalDate date) {
+    private void onDayClicked(LocalDate date, int clickCount) {
         if (brushTask == null) {
             // Journal-Only: clicking a day shows its entries/events in the bottom panel.
             if (config.isCalendarJournalOnly()) {
@@ -358,11 +378,19 @@ public class CalendarPage extends BorderPane {
                 renderTaskList();   // refresh bottom detail panel
                 return;
             }
-            // Task+Journal: a single note per day via the simple editor.
-            if (config.isCalendarJournalEnabled()) { openJournalEditor(date); return; }
+            // Task+Journal: the per-day journal opens on a DOUBLE-click (a single click is reserved
+            // so it no longer pops the editor every time the user clicks a day).
+            if (config.isCalendarJournalEnabled()) {
+                if (clickCount >= 2) openJournalEditor(date);
+                else hintLabel.setText(Lang.CAL_HINT_DOUBLE_CLICK_JOURNAL.get());
+                return;
+            }
             hintLabel.setText(Lang.CAL_HINT_SELECT_TASK.get());
             return;
         }
+        // With a brush selected, act only on the first click of a sequence so a quick double-click
+        // doesn't toggle the same day twice.
+        if (clickCount != 1) return;
         LocalDate today = LocalDate.now();
         if (!config.isAllowCalendarManipulation() && !date.equals(today)) {
             hintLabel.setText(Lang.CAL_HINT_TODAY_ONLY.get());
@@ -497,6 +525,8 @@ public class CalendarPage extends BorderPane {
     private void applyRewards(CalendarTask task, boolean gained) {
         if (!config.isCalendarGrantsXp()) return;
 
+        String ledgerSource = (gained ? "Calendar: " : "Reverted: Calendar: ") + task.getName();
+
         // Stat XP (multiple stats) — reversible. Routes through the EXP pool when enabled.
         for (var entry : task.getStatRewards().entrySet()) {
             for (CustomStat stat : appStats.getCustomStats()) {
@@ -504,6 +534,8 @@ public class CalendarPage extends BorderPane {
                     int cap = stat.getEffectiveMaxCap(appStats.getActiveDebuffs());
                     if (gained) stat.gain(entry.getValue(), cap);
                     else stat.drain(entry.getValue(), cap);
+                    appStats.recordStatChange(stat.getName(), gained ? entry.getValue() : -entry.getValue(),
+                            stat.isUseExp() ? "XP" : "pts", ledgerSource);
                     break;
                 }
             }
@@ -515,6 +547,7 @@ public class CalendarPage extends BorderPane {
                 if (stat.getId().equals(entry.getKey())) {
                     int delta = gained ? entry.getValue() : -entry.getValue();
                     stat.setMaxCap(Math.max(0, stat.getMaxCap() + delta));
+                    appStats.recordStatChange(stat.getName(), delta, "Max Cap", ledgerSource);
                     break;
                 }
             }
@@ -524,6 +557,8 @@ public class CalendarPage extends BorderPane {
         if (task.getRewardPoints() != 0) {
             int delta = gained ? task.getRewardPoints() : -task.getRewardPoints();
             appStats.setGlobalScore(Math.max(0, appStats.getGlobalScore() + delta));
+            appStats.recordStatChange(com.raeden.ors_to_do.dependencies.models.StatLedgerEntry.GLOBAL_SCORE,
+                    delta, "pts", ledgerSource);
         }
 
         if (!gained) return; // debuffs & hooks only fire on mark
@@ -569,16 +604,45 @@ public class CalendarPage extends BorderPane {
     private void renderTaskList() {
         taskListBox.getChildren().clear();
 
+        // The Per Row / Per Column selector only applies to the task list (hidden in Journal-Only).
+        boolean journalOnly = config.isCalendarJournalOnly();
+        viewModeBox.setVisible(!journalOnly);
+        viewModeBox.setManaged(!journalOnly);
+
         // Journal-only: the bottom panel shows the SELECTED day's entries/events.
-        if (config.isCalendarJournalOnly()) {
+        if (journalOnly) {
             renderDayDetail();
             return;
         }
 
         bottomTitle.setText(Lang.CAL_TASK_LIST_TITLE.get());
-        taskListBox.getChildren().add(buildAddCard());
-        for (CalendarTask t : config.getCalendarTasks()) {
-            taskListBox.getChildren().add(buildTaskCard(t));
+
+        List<Region> cards = new ArrayList<>();
+        cards.add(buildAddCard());
+        for (CalendarTask t : config.getCalendarTasks()) cards.add(buildTaskCard(t));
+
+        if (config.isCalendarTaskColumnView()) {
+            // Grid layout: multiple cards per row, up to COLUMN_VIEW_COLS columns.
+            GridPane tg = new GridPane();
+            tg.setHgap(8);
+            tg.setVgap(8);
+            tg.setMaxWidth(Double.MAX_VALUE);
+            for (int c = 0; c < COLUMN_VIEW_COLS; c++) {
+                ColumnConstraints cc = new ColumnConstraints();
+                cc.setPercentWidth(100.0 / COLUMN_VIEW_COLS);
+                cc.setHgrow(Priority.ALWAYS);
+                tg.getColumnConstraints().add(cc);
+            }
+            for (int i = 0; i < cards.size(); i++) {
+                Region card = cards.get(i);
+                card.setMaxWidth(Double.MAX_VALUE);
+                GridPane.setHgrow(card, Priority.ALWAYS);
+                tg.add(card, i % COLUMN_VIEW_COLS, i / COLUMN_VIEW_COLS);
+            }
+            taskListBox.getChildren().add(tg);
+        } else {
+            // One card per row (default).
+            taskListBox.getChildren().addAll(cards);
         }
     }
 
@@ -836,7 +900,51 @@ public class CalendarPage extends BorderPane {
         menu.getItems().addAll(editItem, removeItem);
         card.setOnContextMenuRequested(e -> menu.show(card, e.getScreenX(), e.getScreenY()));
 
+        // Drag-to-reorder: dragging a card onto another reorders the task list. Works in both the
+        // Per Row and Per Column layouts.
+        card.setOnDragDetected(e -> {
+            javafx.scene.input.Dragboard dbd = card.startDragAndDrop(javafx.scene.input.TransferMode.MOVE);
+            javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+            cc.putString(t.getId());
+            dbd.setContent(cc);
+            e.consume();
+        });
+        card.setOnDragOver(e -> {
+            if (e.getGestureSource() != card && e.getDragboard().hasString()) e.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+            e.consume();
+        });
+        card.setOnDragEntered(e -> {
+            if (e.getGestureSource() != card && e.getDragboard().hasString())
+                card.setStyle(base + " -fx-border-color: #569CD6; -fx-border-width: 2;");
+        });
+        card.setOnDragExited(e -> card.setStyle(base));
+        card.setOnDragDropped(e -> {
+            javafx.scene.input.Dragboard dbd = e.getDragboard();
+            boolean success = false;
+            if (dbd.hasString()) { reorderCalendarTasks(dbd.getString(), t.getId()); success = true; }
+            e.setDropCompleted(success);
+            e.consume();
+        });
+
         return card;
+    }
+
+    /** Moves the dragged task so it lands at the drop target's position in the task list. */
+    private void reorderCalendarTasks(String fromId, String toId) {
+        if (fromId == null || fromId.equals(toId)) return;
+        List<CalendarTask> list = config.getCalendarTasks();
+        CalendarTask from = config.findCalendarTask(fromId);
+        if (from == null) return;
+        list.remove(from);
+        int insertIdx = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getId().equals(toId)) { insertIdx = i; break; }
+        }
+        if (insertIdx < 0) insertIdx = list.size();
+        list.add(insertIdx, from);
+        StorageManager.saveStats(appStats);
+        refreshFilterBox();
+        renderTaskList();
     }
 
     private String rewardSummary(CalendarTask t) {

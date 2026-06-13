@@ -419,6 +419,31 @@ public class AppStats implements Serializable {
         statXpMap.put(statId, statXpMap.getOrDefault(statId, 0) + amount);
     }
 
+    /**
+     * Append-only ledger of stat point/EXP changes with their source, newest entries last. Capped
+     * to {@link #STAT_LEDGER_CAP}; the Stat-page History dialog reads it newest-first.
+     */
+    private static final int STAT_LEDGER_CAP = 300;
+    private List<StatLedgerEntry> statLedger = new ArrayList<>();
+
+    public List<StatLedgerEntry> getStatLedger() {
+        if (statLedger == null) statLedger = new ArrayList<>();
+        return statLedger;
+    }
+    public void setStatLedger(List<StatLedgerEntry> statLedger) { this.statLedger = statLedger; }
+
+    /**
+     * Records one stat change in the ledger. A {@code amount} of 0 is ignored. The list is capped
+     * to the most recent {@link #STAT_LEDGER_CAP} entries. Callers still persist via
+     * {@code StorageManager.saveStats(...)} as part of their normal save.
+     */
+    public void recordStatChange(String statName, int amount, String unit, String source) {
+        if (amount == 0) return;
+        List<StatLedgerEntry> log = getStatLedger();
+        log.add(new StatLedgerEntry(LocalDateTime.now(), statName, amount, unit, source));
+        while (log.size() > STAT_LEDGER_CAP) log.remove(0);
+    }
+
     public void saveDraft(OriginModule module, String text) {
         if (text != null && !text.trim().isEmpty()) {
             pendingDrafts.put(module, text.trim());
@@ -474,6 +499,7 @@ public class AppStats implements Serializable {
         this.customStats = new ArrayList<>(other.customStats);
         this.statXpMap = new HashMap<>(other.statXpMap);
         this.lastStatGainDates = new HashMap<>(other.lastStatGainDates);
+        this.statLedger = new ArrayList<>(other.getStatLedger());
 
         this.activeDebuffs = new ArrayList<>(other.getActiveDebuffs());
         this.debuffTemplates = new ArrayList<>(other.getDebuffTemplates());

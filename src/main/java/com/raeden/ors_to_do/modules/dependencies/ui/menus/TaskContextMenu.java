@@ -1,6 +1,7 @@
 package com.raeden.ors_to_do.modules.dependencies.ui.menus;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
+import com.raeden.ors_to_do.dependencies.models.CategoryStyle;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
@@ -205,6 +206,54 @@ public class TaskContextMenu {
             moveMenu.getItems().add(emptyInfo);
         }
 
+        // --- Move to Category (only when this page has categories enabled) ---
+        Menu categoryMenu = null;
+        if (config != null && config.isEnableCategories()) {
+            categoryMenu = new Menu("Move to Category");
+
+            // Gather every category available on this page: styled categories plus any
+            // categoryName already in use by tasks belonging to this section.
+            java.util.LinkedHashSet<String> categories = new java.util.LinkedHashSet<>();
+            for (CategoryStyle cs : config.getCategoryStyles()) {
+                if (cs.getName() != null && !cs.getName().trim().isEmpty()) categories.add(cs.getName().trim());
+            }
+            if (globalDatabase != null) {
+                for (TaskItem other : globalDatabase) {
+                    if (!config.getId().equals(other.getSectionId())) continue;
+                    String c = other.getCategoryName();
+                    if (c != null && !c.trim().isEmpty()) categories.add(c.trim());
+                }
+            }
+            java.util.List<String> sortedCategories = new java.util.ArrayList<>(categories);
+            sortedCategories.sort(String.CASE_INSENSITIVE_ORDER);
+
+            String currentCategory = task.getCategoryName();
+            ToggleGroup categoryGroup = new ToggleGroup();
+
+            for (String cat : sortedCategories) {
+                RadioMenuItem catItem = new RadioMenuItem(cat);
+                catItem.setToggleGroup(categoryGroup);
+                catItem.setSelected(cat.equals(currentCategory));
+                catItem.setOnAction(e -> {
+                    task.setCategoryName(cat);
+                    StorageManager.saveTasks(globalDatabase);
+                    onUpdate.run();
+                });
+                categoryMenu.getItems().add(catItem);
+            }
+            if (!sortedCategories.isEmpty()) categoryMenu.getItems().add(new SeparatorMenuItem());
+
+            RadioMenuItem uncategorizedItem = new RadioMenuItem("Set as Uncategorized");
+            uncategorizedItem.setToggleGroup(categoryGroup);
+            uncategorizedItem.setSelected(currentCategory == null || currentCategory.trim().isEmpty());
+            uncategorizedItem.setOnAction(e -> {
+                task.setCategoryName(null);
+                StorageManager.saveTasks(globalDatabase);
+                onUpdate.run();
+            });
+            categoryMenu.getItems().add(uncategorizedItem);
+        }
+
         MenuItem toggleFavoriteItem = new MenuItem(task.isFavorite() ? "Remove Favorite" : "Favorite Task");
         if (config != null && !config.isAllowFavorite()) toggleFavoriteItem.setDisable(true);
         toggleFavoriteItem.setOnAction(e -> {
@@ -272,7 +321,10 @@ public class TaskContextMenu {
                 new SeparatorMenuItem(),
                 duplicateItem,
                 colorItem,
-                moveMenu,
+                moveMenu
+        );
+        if (categoryMenu != null) contextMenu.getItems().add(categoryMenu);
+        contextMenu.getItems().addAll(
                 toggleFavoriteItem,
                 new SeparatorMenuItem(),
                 archiveItem,

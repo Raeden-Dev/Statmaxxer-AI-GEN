@@ -54,6 +54,10 @@ public class TaskItem implements Serializable {
     private boolean isLinkCard;
     private String linkActionPath;
 
+    // --- Description card: shows a Copy button instead of a checkbox; clicking copies descriptionContent. ---
+    private boolean isDescriptionCard = false;
+    private String descriptionContent = "";
+
     private boolean isChallengeCard = false;
     private int perkLevel = 0;
     private int weeksMaintained = 0;
@@ -239,6 +243,12 @@ public class TaskItem implements Serializable {
 
     public String getLinkActionPath() { return linkActionPath; }
     public void setLinkActionPath(String linkActionPath) { this.linkActionPath = linkActionPath; }
+
+    public boolean isDescriptionCard() { return isDescriptionCard; }
+    public void setDescriptionCard(boolean descriptionCard) { this.isDescriptionCard = descriptionCard; }
+
+    public String getDescriptionContent() { return descriptionContent == null ? "" : descriptionContent; }
+    public void setDescriptionContent(String descriptionContent) { this.descriptionContent = descriptionContent; }
 
     public boolean isChallengeCard() { return isChallengeCard; }
     public void setChallengeCard(boolean challengeCard) { this.isChallengeCard = challengeCard; }

@@ -7,10 +7,14 @@ import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import com.raeden.ors_to_do.modules.dependencies.ui.utils.TaskActionHandler;
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
+import javafx.util.Duration;
 
 import java.util.List;
 
@@ -53,7 +57,23 @@ public class TaskActionControls extends HBox {
         // 3. Action Logic (Pin / Lock / Buy / Counter / Checkbox)
         boolean hasUnfinishedSubTasks = !task.isFinished() && config != null && config.isEnableSubTasks() && !task.getSubTasks().isEmpty() && task.getSubTasks().stream().anyMatch(sub -> !sub.isFinished());
 
-        if (isNoteMode) {
+        if (task.isDescriptionCard()) {
+            // Description cards replace the checkbox with a Copy button that copies the card's
+            // stored description text to the system clipboard.
+            Button copyBtn = new Button("📋 Copy");
+            copyBtn.setStyle("-fx-background-color: #2D2D30; -fx-text-fill: #DCDCAA; -fx-border-color: #DCDCAA; -fx-border-radius: 4; -fx-background-radius: 4; -fx-cursor: hand; -fx-font-weight: bold; -fx-font-size: " + metaFontSize + "px; -fx-padding: 4 10;");
+            copyBtn.setOnAction(e -> {
+                ClipboardContent cc = new ClipboardContent();
+                cc.putString(task.getDescriptionContent());
+                Clipboard.getSystemClipboard().setContent(cc);
+                copyBtn.setText("✓ Copied");
+                PauseTransition revert = new PauseTransition(Duration.seconds(1.2));
+                revert.setOnFinished(ev -> copyBtn.setText("📋 Copy"));
+                revert.play();
+            });
+            getChildren().add(copyBtn);
+
+        } else if (isNoteMode) {
             Button pinBtn = new Button("📌");
             pinBtn.setStyle("-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: " + baseFontSize + "px; -fx-text-fill: " + (task.isPinned() ? "#FF6666" : "#FFFFFF") + "; -fx-opacity: " + (task.isPinned() ? 1.0 : 0.5) + ";");
             pinBtn.setOnAction(e -> { task.setPinned(!task.isPinned()); StorageManager.saveTasks(globalDatabase); onUpdate.run(); });
@@ -98,6 +118,11 @@ public class TaskActionControls extends HBox {
                 if (task.getCurrentCount() > 0) {
                     if (task.isPointsClaimed()) {
                         appStats.setGlobalScore(appStats.getGlobalScore() - task.getRewardPoints());
+                        if (task.getRewardPoints() != 0) {
+                            appStats.recordStatChange(com.raeden.ors_to_do.dependencies.models.StatLedgerEntry.GLOBAL_SCORE,
+                                    -task.getRewardPoints(), "pts",
+                                    "Reverted: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent()));
+                        }
                         if (config != null && config.isEnableStatsSystem()) {
                             TaskActionHandler.processRPGStats(task, appStats, false);
                         }
@@ -151,6 +176,11 @@ public class TaskActionControls extends HBox {
                 } else {
                     if (task.isPointsClaimed()) {
                         appStats.setGlobalScore(appStats.getGlobalScore() - task.getRewardPoints());
+                        if (task.getRewardPoints() != 0) {
+                            appStats.recordStatChange(com.raeden.ors_to_do.dependencies.models.StatLedgerEntry.GLOBAL_SCORE,
+                                    -task.getRewardPoints(), "pts",
+                                    "Reverted: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent()));
+                        }
                         if (config != null && config.isEnableStatsSystem()) {
                             TaskActionHandler.processRPGStats(task, appStats, false);
                         }

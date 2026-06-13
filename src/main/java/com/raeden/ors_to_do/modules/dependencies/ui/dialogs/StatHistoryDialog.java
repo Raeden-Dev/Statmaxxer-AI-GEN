@@ -1,163 +1,54 @@
 package com.raeden.ors_to_do.modules.dependencies.ui.dialogs;
 
 import com.raeden.ors_to_do.dependencies.models.AppStats;
-import com.raeden.ors_to_do.dependencies.models.CustomStat;
-import com.raeden.ors_to_do.dependencies.models.Debuff;
+import com.raeden.ors_to_do.dependencies.models.StatLedgerEntry;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Border;
-import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
+/**
+ * Stat-page History: a chronological ledger of every Custom Stat / Global Score point/EXP change
+ * and its source (task completion, miss penalty, reward purchase, calendar mark, focus session …).
+ * Reads {@link AppStats#getStatLedger()} newest-first. The ledger is recorded going forward, so it
+ * shows activity from the point the feature was added onward.
+ */
 public class StatHistoryDialog {
 
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
+
+    /** {@code globalDatabase} is retained for call-site compatibility; the ledger is the source now. */
     public static void show(AppStats appStats, List<TaskItem> globalDatabase) {
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Recent RPG History");
+        dialog.setTitle("Stat History");
         TaskDialogs.styleDialog(dialog);
 
-        VBox content = new VBox(10);
+        VBox content = new VBox(8);
         content.setPadding(new Insets(10));
 
-        boolean hasHistory = false;
-        String baseBadgeStyle = "-fx-padding: 2 6; -fx-background-radius: 5; -fx-font-weight: bold; -fx-font-size: 11px;";
+        List<StatLedgerEntry> ledger = appStats.getStatLedger();
 
-        // Iterate backward to show most recent tasks first
-        for (int i = globalDatabase.size() - 1; i >= 0; i--) {
-            TaskItem task = globalDatabase.get(i);
-
-            boolean hasRewards = task.getStatRewards() != null && !task.getStatRewards().isEmpty();
-            boolean hasCapRewards = task.getStatCapRewards() != null && !task.getStatCapRewards().isEmpty();
-            boolean hasCosts = task.getStatCosts() != null && !task.getStatCosts().isEmpty();
-            boolean hasPenalties = task.getStatPenalties() != null && !task.getStatPenalties().isEmpty();
-            boolean hasDebuffs = task.getInflictedDebuffIds() != null && !task.getInflictedDebuffIds().isEmpty();
-
-            // --- FIXED: Correctly determine if a task was missed/failed using available flags ---
-            boolean isMissed = task.isPenaltyApplied() || (task.isArchived() && !task.isFinished());
-
-            String dateStr = "Unknown Date";
-            if (task.getDateCompleted() != null) {
-                dateStr = task.getDateCompleted().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"));
-            } else if (task.getPerkUnlockedDate() != null) {
-                dateStr = task.getPerkUnlockedDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"));
-            } else if (task.getDateCreated() != null) {
-                dateStr = task.getDateCreated().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"));
-            }
-
-            // ==========================================
-            // 1. GAINS CARD (Task Completed Successfully)
-            // ==========================================
-            if (task.isFinished() && (hasRewards || hasCapRewards || hasCosts)) {
-                hasHistory = true;
-
-                VBox entryBox = new VBox(5);
-                entryBox.setStyle("-fx-background-color: #2D2D30; -fx-padding: 10; -fx-border-radius: 5; -fx-background-radius: 5; -fx-border-color: #4EC9B0; -fx-border-width: 1;");
-
-                Label sourceLabel = new Label("✔️ Completed: " + task.getTextContent());
-                sourceLabel.setStyle("-fx-text-fill: #4EC9B0; -fx-font-size: 14px; -fx-font-weight: bold;");
-
-                Label dateLabel = new Label("Date: " + dateStr);
-                dateLabel.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
-
-                FlowPane badgesBox = new FlowPane(5, 5);
-
-                if (hasRewards) {
-                    for (Map.Entry<String, Integer> entry : task.getStatRewards().entrySet()) {
-                        CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
-                        if (stat != null) {
-                            Label lbl = new Label("+" + entry.getValue() + " " + stat.getName());
-                            lbl.setStyle("-fx-text-fill: #4EC9B0; -fx-background-color: #1A332E; " + baseBadgeStyle);
-                            badgesBox.getChildren().add(lbl);
-                        }
-                    }
-                }
-
-                if (hasCapRewards) {
-                    for (Map.Entry<String, Integer> entry : task.getStatCapRewards().entrySet()) {
-                        CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
-                        if (stat != null) {
-                            Label lbl = new Label("▲ " + entry.getValue() + " Max " + stat.getName());
-                            lbl.setStyle("-fx-text-fill: #C586C0; -fx-background-color: #2D1E2D; " + baseBadgeStyle);
-                            badgesBox.getChildren().add(lbl);
-                        }
-                    }
-                }
-
-                if (hasCosts) {
-                    for (Map.Entry<String, Integer> entry : task.getStatCosts().entrySet()) {
-                        CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
-                        if (stat != null) {
-                            Label lbl = new Label("~" + entry.getValue() + " " + stat.getName());
-                            lbl.setStyle("-fx-text-fill: #FF8C00; -fx-background-color: #331C00; " + baseBadgeStyle);
-                            badgesBox.getChildren().add(lbl);
-                        }
-                    }
-                }
-
-                entryBox.getChildren().addAll(sourceLabel, dateLabel, badgesBox);
-                content.getChildren().add(entryBox);
-            }
-
-            // ==========================================
-            // 2. LOSSES CARD (Task Missed / Failed)
-            // ==========================================
-            if (isMissed && (hasPenalties || hasDebuffs)) {
-                hasHistory = true;
-
-                VBox entryBox = new VBox(5);
-                // Deep red background and border for failure cards
-                entryBox.setStyle("-fx-background-color: #331A1A; -fx-padding: 10; -fx-border-radius: 5; -fx-background-radius: 5; -fx-border-color: #E06666; -fx-border-width: 1;");
-
-                Label sourceLabel = new Label("❌ Missed: " + task.getTextContent());
-                sourceLabel.setStyle("-fx-text-fill: #E06666; -fx-font-size: 14px; -fx-font-weight: bold;");
-
-                Label dateLabel = new Label("Date: " + dateStr);
-                dateLabel.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
-
-                FlowPane badgesBox = new FlowPane(5, 5);
-
-                if (hasPenalties) {
-                    for (Map.Entry<String, Integer> entry : task.getStatPenalties().entrySet()) {
-                        CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
-                        if (stat != null) {
-                            Label lbl = new Label("-" + entry.getValue() + " " + stat.getName());
-                            lbl.setStyle("-fx-text-fill: #E06666; -fx-background-color: #4A1A1A; " + baseBadgeStyle);
-                            badgesBox.getChildren().add(lbl);
-                        }
-                    }
-                }
-
-                if (hasDebuffs && appStats.getDebuffTemplates() != null) {
-                    for (String dId : task.getInflictedDebuffIds()) {
-                        Debuff d = appStats.getDebuffTemplates().stream().filter(db -> db.getId().equals(dId)).findFirst().orElse(null);
-                        if (d != null) {
-                            String iconText = (d.getIconSymbol() != null && !d.getIconSymbol().equals("None")) ? d.getIconSymbol() + " " : "⚠ ";
-                            String color = d.getColorHex() != null && !d.getColorHex().equals("transparent") ? d.getColorHex() : "#FF4444";
-
-                            Label lbl = new Label("Inflicted: " + iconText + d.getName());
-                            lbl.setStyle("-fx-text-fill: " + color + "; -fx-background-color: derive(" + color + ", -80%); -fx-border-color: " + color + "; -fx-border-radius: 5; " + baseBadgeStyle);
-                            badgesBox.getChildren().add(lbl);
-                        }
-                    }
-                }
-
-                entryBox.getChildren().addAll(sourceLabel, dateLabel, badgesBox);
-                content.getChildren().add(entryBox);
-            }
-        }
-
-        if (!hasHistory) {
-            Label empty = new Label("No recent tasks found that modified RPG stats or debuffs.");
+        if (ledger.isEmpty()) {
+            Label empty = new Label("No stat changes recorded yet.\nRewards and penalties to your stats and points will appear here as you earn them.");
+            empty.setWrapText(true);
             empty.setStyle("-fx-text-fill: #858585; -fx-font-style: italic;");
             content.getChildren().add(empty);
+        } else {
+            // Newest first.
+            for (int i = ledger.size() - 1; i >= 0; i--) {
+                content.getChildren().add(buildRow(ledger.get(i)));
+            }
         }
 
         ScrollPane scroll = new ScrollPane(content);
@@ -174,5 +65,48 @@ public class StatHistoryDialog {
         dialog.getDialogPane().setContent(scroll);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.showAndWait();
+    }
+
+    private static Region buildRow(StatLedgerEntry e) {
+        boolean isCap = "Max Cap".equals(e.getUnit());
+        boolean gain = e.isGain();
+
+        // Colour: caps purple, gains teal, losses red.
+        String accent = isCap ? "#C586C0" : (gain ? "#4EC9B0" : "#E06666");
+        String badgeBg = isCap ? "#2D1E2D" : (gain ? "#1A332E" : "#4A1A1A");
+
+        HBox row = new HBox(10);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(8, 10, 8, 10));
+        row.setStyle("-fx-background-color: #2D2D30; -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-width: 1; -fx-border-color: " + accent + ";");
+
+        // Badge: signed amount + unit + stat name.
+        Label badge = new Label(formatBadge(e));
+        badge.setMinWidth(Region.USE_PREF_SIZE);
+        badge.setStyle("-fx-text-fill: " + accent + "; -fx-background-color: " + badgeBg + "; -fx-padding: 2 8; -fx-background-radius: 6; -fx-font-weight: bold; -fx-font-size: 12px;");
+
+        VBox textBox = new VBox(2);
+        HBox.setHgrow(textBox, Priority.ALWAYS);
+        Label source = new Label(e.getSource());
+        source.setWrapText(true);
+        source.setStyle("-fx-text-fill: #E0E0E0; -fx-font-size: 12px;");
+        Label date = new Label(e.getDate() != null ? e.getDate().format(FMT) : "");
+        date.setStyle("-fx-text-fill: #858585; -fx-font-size: 10px;");
+        textBox.getChildren().addAll(source, date);
+
+        row.getChildren().addAll(badge, textBox);
+        return row;
+    }
+
+    private static String formatBadge(StatLedgerEntry e) {
+        String sign = e.getAmount() > 0 ? "+" : "";
+        String amount = sign + e.getAmount();
+        if ("Max Cap".equals(e.getUnit())) {
+            return "▲ " + amount + " Max " + e.getStatName();
+        }
+        if (e.isGlobalScore()) {
+            return amount + " pts";
+        }
+        return amount + " " + e.getStatName() + " " + e.getUnit();
     }
 }

@@ -391,14 +391,17 @@ public class PomodoroTimer extends VBox {
                         boolean earnedRewards = false;
                         if (appStats.getFocusRewardPoints() > 0) {
                             appStats.setGlobalScore(appStats.getGlobalScore() + appStats.getFocusRewardPoints());
+                            appStats.recordStatChange(com.raeden.ors_to_do.dependencies.models.StatLedgerEntry.GLOBAL_SCORE,
+                                    appStats.getFocusRewardPoints(), "pts", "Focus Session");
                             earnedRewards = true;
                         }
 
                         for (Map.Entry<String, Integer> entry : appStats.getFocusStatRewards().entrySet()) {
                             CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
-                            if (stat != null) {
+                            if (stat != null && entry.getValue() != null && entry.getValue() != 0) {
                                 stat.gain(entry.getValue(), stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
                                 stat.setLifetimeEarned(stat.getLifetimeEarned() + entry.getValue());
+                                appStats.recordStatChange(stat.getName(), entry.getValue(), stat.isUseExp() ? "XP" : "pts", "Focus Session");
                                 earnedRewards = true;
                             }
                         }
