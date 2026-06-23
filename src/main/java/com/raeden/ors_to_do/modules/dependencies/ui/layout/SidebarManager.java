@@ -10,19 +10,30 @@ import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class SidebarManager extends BorderPane {
     private AppStats appStats;
@@ -36,11 +47,17 @@ public class SidebarManager extends BorderPane {
     // --- FIXED: Make ScrollPane a permanent class variable ---
     private ScrollPane dynamicScrollPane;
 
-    public SidebarManager(AppStats appStats, List<TaskItem> globalDatabase, GlobalSearchBar searchBar, Consumer<String> onNavigate) {
+    // --- Pop-out windows: each sidebar section can be detached into its own window. ---
+    private static final int MAX_POPOUTS = 5;
+    private final Map<String, Stage> popOutWindows = new LinkedHashMap<>();
+    private final Function<String, Node> popOutFactory;
+
+    public SidebarManager(AppStats appStats, List<TaskItem> globalDatabase, GlobalSearchBar searchBar, Consumer<String> onNavigate, Function<String, Node> popOutFactory) {
         this.appStats = appStats;
         this.searchBar = searchBar;
         this.onNavigate = onNavigate;
         this.globalDatabase = globalDatabase;
+        this.popOutFactory = popOutFactory;
 
         getStyleClass().add("sidebar");
         setPrefWidth(220);
@@ -202,7 +219,7 @@ public class SidebarManager extends BorderPane {
         setBottom(bottomBox);
     }
 
-    private Button createSidebarButton(String displayText, String internalId, String hexColor, int taskCount) {
+    private Node createSidebarButton(String displayText, String internalId, String hexColor, int taskCount) {
         Button btn = new Button(displayText);
         btn.getStyleClass().add("nav-button");
         btn.setMaxWidth(Double.MAX_VALUE);
@@ -233,7 +250,94 @@ public class SidebarManager extends BorderPane {
 
         btn.setOnAction(e -> onNavigate.accept(internalId));
 
-        return btn;
+        // --- Hover-reveal pop-out icon (opens this section in a detached window). ---
+        boolean isPoppedOut = popOutWindows.containsKey(internalId);
+        Label popIcon = new Label(isPoppedOut ? "✖" : "⧉");
+        popIcon.setPickOnBounds(true);
+        popIcon.setCursor(Cursor.HAND);
+        popIcon.setTooltip(new Tooltip(isPoppedOut ? "Close pop-out window" : "Open in a new window"));
+        String popStyleIdle = "-fx-text-fill: " + (isPoppedOut ? "#DCDCAA" : "#858585") + "; -fx-font-size: 12px; -fx-padding: 2 6; -fx-background-radius: 4;";
+        String popStyleHover = "-fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 2 6; -fx-background-color: #0E639C; -fx-background-radius: 4;";
+        popIcon.setStyle(popStyleIdle);
+        popIcon.setOpacity(isPoppedOut ? 1.0 : 0.0);
+        popIcon.setOnMouseEntered(e -> popIcon.setStyle(popStyleHover));
+        popIcon.setOnMouseExited(e -> popIcon.setStyle(popStyleIdle));
+        popIcon.setOnMouseClicked(e -> { togglePopOut(internalId, displayText); e.consume(); });
+
+        StackPane wrapper = new StackPane(btn, popIcon);
+        wrapper.setMaxWidth(Double.MAX_VALUE);
+        StackPane.setAlignment(popIcon, Pos.CENTER_RIGHT);
+        StackPane.setMargin(popIcon, new Insets(0, 10, 0, 0));
+        wrapper.setOnMouseEntered(e -> popIcon.setOpacity(1.0));
+        wrapper.setOnMouseExited(e -> { if (!popOutWindows.containsKey(internalId)) popIcon.setOpacity(0.0); });
+
+        // --- Right-click context menu: export this section's task information (task-bearing pages only). ---
+        SectionConfig section = appStats.findSection(internalId);
+        boolean exportable = section != null && !section.isSeparator()
+                && !section.isStatPage() && !section.isPerkPage()
+                && !section.isChallengePage() && !section.isCalendarPage();
+        if (exportable) {
+            ContextMenu sectionMenu = new ContextMenu();
+            MenuItem exportItem = new MenuItem("Export Task Information");
+            exportItem.setOnAction(e -> com.raeden.ors_to_do.modules.dependencies.services.TaskInfoExporter.exportSection(
+                    section, globalDatabase, wrapper.getScene() != null ? wrapper.getScene().getWindow() : null));
+            sectionMenu.getItems().add(exportItem);
+            wrapper.setOnContextMenuRequested(e -> {
+                sectionMenu.show(wrapper, e.getScreenX(), e.getScreenY());
+                e.consume();
+            });
+        }
+
+        return wrapper;
+    }
+
+    /**
+     * Toggles a detached pop-out window for the given module. Clicking the icon of a section that
+     * already has an open window closes it; otherwise a new window is opened (up to {@link #MAX_POPOUTS}).
+     */
+    private void togglePopOut(String internalId, String title) {
+        Stage existing = popOutWindows.get(internalId);
+        if (existing != null) {
+            existing.close(); // setOnHidden handler removes it from the map and refreshes the sidebar
+            return;
+        }
+
+        if (popOutWindows.size() >= MAX_POPOUTS) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION,
+                    "You already have " + MAX_POPOUTS + " pop-out windows open. Close one before opening another.");
+            alert.setHeaderText("Pop-out limit reached");
+            alert.showAndWait();
+            return;
+        }
+
+        if (popOutFactory == null) return;
+        Node view = popOutFactory.apply(internalId);
+        if (view == null) return;
+
+        Stage stage = new Stage();
+        stage.setTitle(title);
+        Scene scene = new Scene(new BorderPane(view), 520, 680);
+        // Mirror the main window's stylesheets so the detached view looks identical.
+        if (getScene() != null) {
+            scene.getStylesheets().addAll(getScene().getStylesheets());
+        }
+        stage.setScene(scene);
+        stage.setOnHidden(e -> {
+            popOutWindows.remove(internalId);
+            refreshSidebar();
+        });
+
+        popOutWindows.put(internalId, stage);
+        stage.show();
+        refreshSidebar();
+    }
+
+    /** Closes every open pop-out window. Called when the session is rebuilt (e.g. profile switch). */
+    public void closeAllPopOuts() {
+        for (Stage s : new java.util.ArrayList<>(popOutWindows.values())) {
+            s.close();
+        }
+        popOutWindows.clear();
     }
 
     public void setActiveModule(String internalId) {

@@ -61,6 +61,9 @@ public class AppStats implements Serializable {
 
     private boolean globalStatsEnabled = false;
     private int globalScore = 0;
+
+    /** Email of the Google account connected for Drive sync, or null when not connected. */
+    private String googleDriveEmail = null;
     private int currentStreak = 0;
     private int highestStreak = 0;
     private int lifetimeDeletedTasks = 0;
@@ -168,6 +171,8 @@ public class AppStats implements Serializable {
     public void setGlobalStatsEnabled(boolean globalStatsEnabled) { this.globalStatsEnabled = globalStatsEnabled; }
     public int getGlobalScore() { return globalScore; }
     public void setGlobalScore(int globalScore) { this.globalScore = globalScore; }
+    public String getGoogleDriveEmail() { return googleDriveEmail; }
+    public void setGoogleDriveEmail(String googleDriveEmail) { this.googleDriveEmail = googleDriveEmail; }
     public int getCurrentStreak() { return currentStreak; }
     public void setCurrentStreak(int currentStreak) {
         this.currentStreak = currentStreak;
@@ -489,6 +494,7 @@ public class AppStats implements Serializable {
 
         this.globalStatsEnabled = other.globalStatsEnabled;
         this.globalScore = other.globalScore;
+        this.googleDriveEmail = other.googleDriveEmail;
         this.currentStreak = other.currentStreak;
         this.highestStreak = other.highestStreak;
         this.lifetimeDeletedTasks = other.lifetimeDeletedTasks;

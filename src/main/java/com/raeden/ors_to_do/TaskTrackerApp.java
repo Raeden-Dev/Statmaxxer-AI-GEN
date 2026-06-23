@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class TaskTrackerApp extends Application {
-    public static final String APP_VERSION = "v1.472";
+    public static final String APP_VERSION = "v1.48";
 
     private List<TaskItem> taskDatabase;
     private AppStats appStats;
@@ -42,6 +42,9 @@ public class TaskTrackerApp extends Application {
     private GlobalSearchBar globalSearchBar;
     private SidebarManager sidebarManager;
     private QuickCaptureManager quickCaptureManager;
+
+    /** Shared UI-refresh callback; an instance field so detached pop-out windows can reuse it. */
+    private Runnable syncUI;
 
     /** True on a genuinely fresh install (no data yet) so the setup wizard runs once. */
     private boolean firstLaunch = false;
@@ -182,6 +185,10 @@ public class TaskTrackerApp extends Application {
         Platform.runLater(() -> {
             buildSession(primaryStage);
             GlobalActivityTracker.init();
+            // Mirror every local data write to Google Drive (no-op until an account is connected).
+            StorageManager.setChangeListener(GoogleDriveSyncManager::onDataChanged);
+            // Push the current local data to Drive once on launch (async; no-op when not connected).
+            GoogleDriveSyncManager.syncOnStartup();
             if (firstLaunch) {
                 com.raeden.ors_to_do.modules.dependencies.settings.SetupWizard.show(appStats, () -> {
                     com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(scene, appStats.getTaskFontFamily());
@@ -216,7 +223,11 @@ public class TaskTrackerApp extends Application {
      * startup and again whenever the active profile changes (so the new profile's data is shown).
      */
     private void buildSession(Stage stage) {
-        Runnable syncUI = () -> {
+        // Close any pop-out windows from a previous session before rebuilding (e.g. on profile switch),
+        // since they are bound to the now-stale data references.
+        if (sidebarManager != null) sidebarManager.closeAllPopOuts();
+
+        syncUI = () -> {
             if (currentDynamicPanel != null) currentDynamicPanel.refreshList();
             if (focusHubPanel != null) focusHubPanel.refreshTasks();
             if (analyticsPanel != null) analyticsPanel.refreshData();
@@ -242,7 +253,7 @@ public class TaskTrackerApp extends Application {
             }
         });
 
-        sidebarManager = new SidebarManager(appStats, taskDatabase, globalSearchBar, this::navigateToModule);
+        sidebarManager = new SidebarManager(appStats, taskDatabase, globalSearchBar, this::navigateToModule, this::createPopOutView);
 
         focusHubPanel = new FocusHubModule(appStats, taskDatabase, syncUI);
         analyticsPanel = new AnalyticsModule(appStats, taskDatabase);
@@ -347,6 +358,37 @@ public class TaskTrackerApp extends Application {
         }
 
         if (activePane != null) rootLayout.setCenter(activePane);
+    }
+
+    /**
+     * Builds a fresh, standalone view for the given module id, used by the sidebar's pop-out windows.
+     * Returns an independent instance (not the in-place {@code currentDynamicPanel}) bound to the
+     * same {@code appStats}/{@code taskDatabase}, so edits in a pop-out stay in sync via {@code syncUI}.
+     */
+    private Node createPopOutView(String internalId) {
+        if (internalId.equals("FOCUS")) {
+            FocusHubModule m = new FocusHubModule(appStats, taskDatabase, syncUI);
+            m.refreshTasks();
+            return m;
+        } else if (internalId.equals("ANALYTICS")) {
+            AnalyticsModule m = new AnalyticsModule(appStats, taskDatabase);
+            m.refreshData();
+            return m;
+        } else if (internalId.equals("ARCHIVE")) {
+            ArchivedModule m = new ArchivedModule(taskDatabase, appStats, syncUI);
+            m.refreshList();
+            return m;
+        } else if (internalId.equals("SETTINGS")) {
+            return new SettingsModule(appStats, taskDatabase, syncUI, this::switchProfile);
+        }
+
+        Optional<SectionConfig> matchedConfig = appStats.getSections().stream()
+                .filter(c -> c.getId().equals(internalId))
+                .findFirst();
+        if (matchedConfig.isPresent()) {
+            return new DynamicModule(matchedConfig.get(), taskDatabase, appStats, syncUI);
+        }
+        return null;
     }
 
     @Override

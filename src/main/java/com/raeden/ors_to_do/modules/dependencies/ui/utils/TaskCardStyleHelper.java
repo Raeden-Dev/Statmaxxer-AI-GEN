@@ -13,7 +13,7 @@ import java.util.function.BiConsumer;
 public class TaskCardStyleHelper {
 
     public static String getBaseStyle(TaskItem task, SectionConfig config, AppStats appStats, boolean isLocked) {
-        boolean isNoteMode = config != null && config.isNotesPage();
+        boolean isNoteMode = (config != null && config.isNotesPage()) || task.isNoteCard();
         boolean allowStyling = isNoteMode || (config != null && config.isEnableTaskStyling());
 
         String bgStyle = "";

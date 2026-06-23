@@ -1,0 +1,36 @@
+Statmaxxer — Google Drive Sync setup
+====================================
+
+Google Drive sync mirrors all your Statmaxxer data files to a "statmaxxer-data" folder in your
+Google Drive. Syncing is asynchronous and single-writer (no two writes ever overlap), so it fully
+replaces USB / manual download transfers.
+
+Because Google requires every app to use its OWN OAuth client, you must create a free OAuth client
+once and drop the credentials file into the app's data folder. The app ships without credentials and
+shows a "Not configured" state until you do this.
+
+ONE-TIME SETUP
+--------------
+1. Go to https://console.cloud.google.com/ and create (or pick) a project.
+2. APIs & Services → Library → enable "Google Drive API".
+3. APIs & Services → OAuth consent screen:
+     - User type: External (or Internal if you use Google Workspace).
+     - Add yourself as a Test user.
+     - Scope needed: .../auth/drive.file
+4. APIs & Services → Credentials → Create Credentials → OAuth client ID:
+     - Application type: "Desktop app".
+     - Download the JSON file.
+5. Rename the downloaded file to:  google_client_secret.json
+6. Put it in the Statmaxxer data folder:
+     Settings → Data Management → "Open Data Folder"
+     (typically  %APPDATA%\TaskTracker\google_client_secret.json )
+7. Back in Settings → Cloud Sync, click "Connect Google Account".
+   A browser window opens for you to sign in and grant access. After that, your data syncs
+   automatically on every save, and you can trigger a manual "Sync Now" any time.
+
+NOTES
+-----
+- Only files this app creates (the .db data files) are uploaded; the app cannot see your other
+  Drive files (it uses the restricted drive.file scope).
+- To disconnect, use the "Disconnect" button — this removes the stored token from this machine.
+- The local OAuth redirect listens on http://localhost:8888 during sign-in.

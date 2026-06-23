@@ -36,7 +36,9 @@ public class TaskCard extends VBox {
 
         int baseFontSize = appStats.getTaskFontSize();
         int metaFontSize = Math.max(10, baseFontSize - 2);
-        boolean isNoteMode = config != null && config.isNotesPage();
+        // A card behaves like a note when its section is a Notes page OR the card itself was
+        // converted into a notes card (Allow Notes sections).
+        boolean isNoteMode = (config != null && config.isNotesPage()) || task.isNoteCard();
         boolean isRewardMode = config != null && config.isRewardsPage();
 
         // 1. Calculate Lock State
@@ -58,7 +60,6 @@ public class TaskCard extends VBox {
         HBox mainRow = new HBox(10);
         mainRow.setAlignment(Pos.CENTER_LEFT);
         mainRow.setPadding(new Insets(10));
-        if (task.isLinkCard()) mainRow.setCursor(javafx.scene.Cursor.HAND);
 
         // --- FIXED: Apply both Time Lock AND Section Completion Lock to double-click ---
         mainRow.setOnMouseClicked(event -> {
@@ -82,8 +83,6 @@ public class TaskCard extends VBox {
                 } else {
                     TaskDialogs.showEditDialog(task, config, appStats, globalDatabase, onUpdate);
                 }
-            } else if (event.getClickCount() == 1 && event.getButton() == MouseButton.PRIMARY && task.isLinkCard()) {
-                TaskLinkUtil.openActionPath(task.getLinkActionPath());
             }
         });
 
@@ -115,7 +114,16 @@ public class TaskCard extends VBox {
 
         TaskDeadlineLabel deadlineLbl = null;
         TaskActionControls actionControls = null;
-        if (!isLocked && !task.isLinkCard()) {
+        Button goToLinkBtn = null;
+        if (!isLocked && task.isLinkCard()) {
+            // Link cards expose a dedicated "Go to Link" button (matching the description card's
+            // Copy button style) instead of the old whole-row click + thin "↗" indicator, so they
+            // can coexist with sub-tasks/sub-task links without stray clicks navigating away.
+            goToLinkBtn = new Button("↗ Go to Link");
+            goToLinkBtn.setMinWidth(Region.USE_PREF_SIZE);
+            goToLinkBtn.setStyle("-fx-background-color: #2D2D30; -fx-text-fill: #569CD6; -fx-border-color: #569CD6; -fx-border-radius: 4; -fx-background-radius: 4; -fx-cursor: hand; -fx-font-weight: bold; -fx-font-size: " + metaFontSize + "px; -fx-padding: 4 10;");
+            goToLinkBtn.setOnAction(e -> TaskLinkUtil.openActionPath(task.getLinkActionPath()));
+        } else if (!isLocked) {
             if (task.getDeadline() != null && !isNoteMode) {
                 deadlineLbl = new TaskDeadlineLabel(task, config, appStats, globalDatabase, onUpdate, activeTimelines, metaFontSize);
                 deadlineLbl.setMinWidth(Region.USE_PREF_SIZE);
@@ -127,6 +135,7 @@ public class TaskCard extends VBox {
         if (deadlineLbl != null) mainRow.getChildren().add(deadlineLbl);
         if (eyeBtn != null) mainRow.getChildren().add(eyeBtn);
         if (actionControls != null) mainRow.getChildren().add(actionControls);
+        if (goToLinkBtn != null) mainRow.getChildren().add(goToLinkBtn);
 
         // 7. Assemble Card Components
         SubTaskRenderer subTaskBox = new SubTaskRenderer(task, config, appStats, globalDatabase, onUpdate);
@@ -262,13 +271,6 @@ public class TaskCard extends VBox {
 
             textLabel.setStyle(fontStyle + "-fx-strikethrough: " + (task.isFinished() && !isNoteMode && !task.isLinkCard()) + "; -fx-text-fill: " + (isLocked ? "derive(#E0E0E0, -50%)" : "#E0E0E0") + ";");
             textContainer.getChildren().add(textLabel);
-
-            if (task.isLinkCard()) {
-                Label linkInd = new Label("↗");
-                linkInd.setMinWidth(Region.USE_PREF_SIZE);
-                linkInd.setStyle("-fx-text-fill: " + standardLinkIndColor + "; -fx-font-weight: bold; -fx-font-size: " + metaFontSize + "px; -fx-padding: 0 0 0 5;");
-                textContainer.getChildren().add(linkInd);
-            }
         }
         return textContainer;
     }

@@ -45,6 +45,22 @@ public class StorageManager {
     private static volatile File dataDirOverride;
 
     /**
+     * Optional listener fired after any local data write. Used to trigger async cloud sync without
+     * coupling the storage layer to the sync service. {@code null} = no listener.
+     */
+    private static volatile Runnable changeListener;
+
+    /** Registers a callback invoked after each local data write (e.g. Google Drive sync). */
+    public static void setChangeListener(Runnable listener) { changeListener = listener; }
+
+    private static void notifyChanged() {
+        Runnable l = changeListener;
+        if (l != null) {
+            try { l.run(); } catch (Throwable ignore) { /* sync must never break a save */ }
+        }
+    }
+
+    /**
      * Active profile id. Each profile is a fully separate "world" backed by its own DB file. The
      * built-in {@code "default"} profile keeps the original {@code tasktracker.db} filename so
      * existing installs are unaffected; other profiles live in {@code tasktracker_<id>.db}.
@@ -80,6 +96,7 @@ public class StorageManager {
         try {
             ensureOpen();
             TaskRepository.saveAll(db, tasks == null ? new ArrayList<>() : tasks);
+            notifyChanged();
         } catch (SQLException e) {
             System.err.println("[StorageManager] saveTasks failed: " + e.getMessage());
         }
@@ -100,6 +117,7 @@ public class StorageManager {
         try {
             ensureOpen();
             AppMetaRepository.save(db, stats);
+            notifyChanged();
         } catch (SQLException e) {
             System.err.println("[StorageManager] saveStats failed: " + e.getMessage());
         }

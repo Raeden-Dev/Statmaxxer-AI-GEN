@@ -31,7 +31,6 @@ public class TaskContextMenu {
         boolean isCompletionLocked = config != null && config.isLockCompletedTasks() && task.isFinished();
 
         boolean allowStyling = config != null && (config.isNotesPage() || config.isEnableTaskStyling());
-        boolean isLinkCard = task.isLinkCard();
 
         MenuItem editItem = new MenuItem(isNoteMode ? "Edit Note" : "Edit Task");
         String baseEditText = editItem.getText();
@@ -59,20 +58,21 @@ public class TaskContextMenu {
             addSubTaskItem = new MenuItem("Add Sub-tasks");
             addSubTaskItem.setOnAction(e -> showAddSubTaskDialog(task, globalDatabase, onUpdate));
 
-            if (isLinkCard || isCompletionLocked) {
+            // Link cards may now carry sub-tasks; only the completion lock blocks adding them.
+            if (isCompletionLocked) {
                 addSubTaskItem.setDisable(true);
             }
         }
 
         MenuItem addLinkItem = null;
-        if ((config == null || config.isEnableLinks()) && !isNoteMode && !isLinkCard) {
+        if ((config == null || config.isEnableLinks()) && !isNoteMode) {
             addLinkItem = new MenuItem("Add External Link");
             addLinkItem.setOnAction(e -> showLinkDialog(task, null, globalDatabase, onUpdate));
             if (isCompletionLocked) addLinkItem.setDisable(true);
         }
 
         Menu linksMenu = null;
-        if ((config == null || config.isEnableLinks()) && task.getTaskLinks() != null && !task.getTaskLinks().isEmpty() && !isNoteMode && !isLinkCard) {
+        if ((config == null || config.isEnableLinks()) && task.getTaskLinks() != null && !task.getTaskLinks().isEmpty() && !isNoteMode) {
             linksMenu = new Menu("External Links");
             for (TaskLink link : task.getTaskLinks()) {
                 Menu singleLinkMenu = new Menu(link.getName());
@@ -348,6 +348,7 @@ public class TaskContextMenu {
             catItem.setSelected(cat.equals(currentCategory));
             catItem.setOnAction(e -> {
                 task.setCategoryName(cat);
+                applyCategoryAutoStyle(task, config);
                 StorageManager.saveTasks(globalDatabase);
                 onUpdate.run();
             });
@@ -366,5 +367,42 @@ public class TaskContextMenu {
         categoryMenu.getItems().add(uncategorizedItem);
 
         return categoryMenu;
+    }
+
+    /**
+     * When the section has "Auto-Style on Category" enabled and the card is completely unstyled,
+     * copy the target category's icon and colours onto the card so it visually adopts the category
+     * it was just moved into. One-way and non-destructive: a card with any styling of its own is
+     * left untouched.
+     */
+    public static void applyCategoryAutoStyle(TaskItem task, SectionConfig config) {
+        if (config == null || !config.isAutoStyleOnCategoryDrop()) return;
+        String cat = task.getCategoryName();
+        if (cat == null || cat.trim().isEmpty()) return;
+        if (!isCompletelyUnstyled(task)) return;
+
+        CategoryStyle style = config.findCategoryStyle(cat);
+        if (style == null) return;
+
+        if (style.getBackgroundColor() != null) task.setColorHex(style.getBackgroundColor());
+        if (style.getBorderColor() != null) task.setCustomOutlineColor(style.getBorderColor());
+        if (style.getIconSymbol() != null && !"None".equals(style.getIconSymbol())) {
+            task.setIconSymbol(style.getIconSymbol());
+            task.setIconColor(style.getIconColor() != null ? style.getIconColor() : style.getTextColor());
+        }
+    }
+
+    /** True when the card carries no custom styling of its own (background, outline, sidebox, icon). */
+    private static boolean isCompletelyUnstyled(TaskItem task) {
+        boolean noBg = isBlankOrTransparent(task.getColorHex());
+        boolean noOutline = isBlankOrTransparent(task.getCustomOutlineColor());
+        boolean noSidebox = isBlankOrTransparent(task.getCustomSideboxColor());
+        boolean noIcon = task.getIconSymbol() == null || task.getIconSymbol().isBlank() || "None".equals(task.getIconSymbol());
+        boolean noIconColor = task.getIconColor() == null || task.getIconColor().isBlank();
+        return noBg && noOutline && noSidebox && noIcon && noIconColor;
+    }
+
+    private static boolean isBlankOrTransparent(String color) {
+        return color == null || color.isBlank() || "transparent".equalsIgnoreCase(color);
     }
 }

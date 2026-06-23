@@ -5,6 +5,54 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 
 ---
 
+## v1.48 — 2026-06-23
+
+### Added
+- **Base Stats dialog.** A **⚖ Base Stats** button in the Stat Configuration header (just before the
+  section's "Hide" toggle) opens a dialog to set a baseline value per stat. Each row has a **↩ Reset
+  to Base** button that snaps that stat's current value back to its baseline. Base values persist on
+  each stat.
+- **Export Task Information.** Right-clicking a task-bearing section in the sidebar adds **"Export
+  Task Information"**, which opens the OS save dialog (default name
+  `[section_name]_task_information.txt`) and writes an organized text report of every non-archived
+  task in the section — including status, category/prefix/type, description-card text, sub-task
+  links, and sub-tasks. Available on normal/notes/rewards sections (not Stat/Perk/Challenge/Calendar
+  or separators).
+- **Auto-Style on Category.** A new **"Auto-Style on Category"** toggle in *Edit Section* (shown when
+  Categories are enabled). When on, moving a **completely unstyled** card into a category copies that
+  category's icon, colour, and outline onto the card. One-way and non-destructive — a card with any
+  styling of its own is left untouched.
+- **Allow Notes (per-card notes outside Notes pages).** A new **"Allow Notes"** section toggle. When
+  on, any card in that section can be converted into a **notes card** from its edit dialog
+  (**"Is Notes Card?"**) — the card then behaves like a note (a 📌 pin replaces the checkbox and it
+  never counts as completed). Mutually exclusive with Link, Description, and Repeating cards.
+- **Google Drive sync (cloud save & sync).** A new **Cloud Sync (Google Drive)** card in Settings.
+  Connect a Google account to mirror all data files to a **`statmaxxer-data/`** folder in that
+  account's Drive, removing USB/manual transfer entirely. Syncing is **asynchronous and
+  single-writer** (a single-thread queue guarantees no two writes overlap); local saves upload
+  automatically, with a manual **Sync Now** as well. Uses the restricted `drive.file` scope so the
+  app only sees files it created.
+  - **Setup note:** Google requires each app to use its own OAuth client, which cannot be bundled.
+    Until you add a "Desktop app" OAuth `client_secret.json` to the data folder (renamed to
+    `google_client_secret.json`), Cloud Sync shows a clear **"Not configured"** state and the rest of
+    the app is unaffected. Step-by-step instructions ship in `google_drive_setup.txt`.
+- **Per-stat atrophy reset + countdown.** Each row in Stat Configuration gains a **⏳** button that
+  resets just that stat's atrophy timer, plus an inline countdown showing how long until the stat
+  starts decaying (or "Atrophy due" / "stat at 0" status). The countdown is hidden for stats with no
+  atrophy configured.
+- **Settings quick-jump nav.** A floating, icon-based menu pinned to the right of the Settings page
+  jumps straight to each section (Help, Profiles, General, Sections, Templates, Stats, Priorities,
+  Data, Cloud Sync, Danger Zone).
+- **Sidebar pop-out windows.** Hovering a sidebar button reveals a **⧉** icon that opens that section
+  in its own detached window (up to 5 at once); clicking it again closes that window.
+- **Link cards: "Go to Link" button + sub-tasks.** Link cards now show a proper **↗ Go to Link**
+  button (styled like the description card's Copy button) instead of the thin indicator, and can
+  coexist with sub-tasks and sub-task links in the same section.
+
+### Changed / Fixed
+- **Score can no longer go negative from daily penalties.** Missed-task penalties now clamp the
+  global score at zero, and the stat ledger records the actual (clamped) change.
+
 ## v1.472 — 2026-06-14
 
 ### Added

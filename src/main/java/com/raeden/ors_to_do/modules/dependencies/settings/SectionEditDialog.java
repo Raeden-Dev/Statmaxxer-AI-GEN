@@ -163,6 +163,14 @@ public class SectionEditDialog {
         CheckBox enableCategoriesCheck = new CheckBox(com.raeden.ors_to_do.i18n.Lang.CATEGORY_ENABLE_TOGGLE.get());
         enableCategoriesCheck.setSelected(config.isEnableCategories());
 
+        // --- NEW: Auto-style a completely unstyled card with its category's look on move ---
+        CheckBox autoStyleCategoryCheck = new CheckBox("Auto-Style on Category");
+        autoStyleCategoryCheck.setSelected(config.isAutoStyleOnCategoryDrop());
+
+        // --- NEW: Allow converting individual cards into notes cards on a non-Notes page ---
+        CheckBox allowNotesCheck = new CheckBox("Allow Notes");
+        allowNotesCheck.setSelected(config.isAllowNotes());
+
         featuresGrid.add(createToggle(allowManualArchiveCheck, "Enables right-click to send tasks to Archive."), 0, 0);
         featuresGrid.add(createToggle(enableSubTasksCheck, "Allows creating nested to-do items inside a card."), 0, 1);
         featuresGrid.add(createToggle(showDateCheck, "Displays the exact date the task was generated."), 0, 2);
@@ -189,6 +197,8 @@ public class SectionEditDialog {
         featuresGrid.add(createToggle(enableLinkCardsCheck, "Allows creating tasks that act purely as clickable shortcuts."), 1, 9);
         featuresGrid.add(createToggle(allowRepeatingTasksCheck, "Turns cards into unlimited clickers to farm stats/points."), 1, 10);
         featuresGrid.add(createToggle(enableCategoriesCheck, com.raeden.ors_to_do.i18n.Lang.CATEGORY_ENABLE_DESC.get()), 1, 11);
+        featuresGrid.add(createToggle(autoStyleCategoryCheck, "When a completely unstyled card is moved into a category, copy that category's icon/colour/style onto it."), 1, 12);
+        featuresGrid.add(createToggle(allowNotesCheck, "Lets any card in this section be converted into a notes card (pin, no completion) from its edit dialog."), 0, 13);
 
         content.getChildren().addAll(featuresGrid, new Separator());
 
@@ -220,8 +230,10 @@ public class SectionEditDialog {
                 enableTimedTasksCheck.setDisable(true); enableTimedTasksCheck.setSelected(false);
                 allowRepeatingTasksCheck.setDisable(true); allowRepeatingTasksCheck.setSelected(false);
             } else {
-                boolean subTasks = enableSubTasksCheck.isSelected(); boolean links = enableLinkCardsCheck.isSelected(); boolean focus = trackTimeCheck.isSelected();
-                enableSubTasksCheck.setDisable(links); enableLinkCardsCheck.setDisable(subTasks || focus); trackTimeCheck.setDisable(links);
+                boolean links = enableLinkCardsCheck.isSelected(); boolean focus = trackTimeCheck.isSelected();
+                // Link cards may now coexist with sub-tasks / sub-task links; only focus-time tracking
+                // remains mutually exclusive with link cards (a link card never tracks time).
+                enableSubTasksCheck.setDisable(false); enableLinkCardsCheck.setDisable(focus); trackTimeCheck.setDisable(links);
                 enableZenModeCheck.setDisable(false); showPriorityCheck.setDisable(false);
                 enableTimedTasksCheck.setDisable(false); allowRepeatingTasksCheck.setDisable(false);
             }
@@ -269,6 +281,12 @@ public class SectionEditDialog {
             streakCheck.setDisable(!hasInterval); if (!hasInterval) streakCheck.setSelected(false);
             boolean hasPoints = enableScoreCheck.isSelected() || enableStatsSystemCheck.isSelected();
             enableOptionalTasksCheck.setDisable(!hasInterval || !hasPoints); if (!hasInterval || !hasPoints) enableOptionalTasksCheck.setSelected(false);
+
+            // Auto-Style only matters when categories are on; "Allow Notes" only applies to normal
+            // pages (special page types either are notes already or render no task cards).
+            boolean categoriesOn = enableCategoriesCheck.isSelected() && !enableCategoriesCheck.isDisabled();
+            autoStyleCategoryCheck.setDisable(!categoriesOn); if (!categoriesOn) autoStyleCategoryCheck.setSelected(false);
+            allowNotesCheck.setDisable(isSpecial); if (isSpecial) allowNotesCheck.setSelected(false);
         };
 
         intervalSpinner.valueProperty().addListener((obs, oldVal, newVal) -> updateUIState.run());
@@ -277,6 +295,7 @@ public class SectionEditDialog {
         trackTimeCheck.setOnAction(e -> updateUIState.run());
         enableScoreCheck.setOnAction(e -> updateUIState.run());
         enableStatsSystemCheck.setOnAction(e -> updateUIState.run());
+        enableCategoriesCheck.setOnAction(e -> updateUIState.run());
 
         rewardsPageCheck.setOnAction(e -> { if(rewardsPageCheck.isSelected()) { notesPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
         notesPageCheck.setOnAction(e -> { if(notesPageCheck.isSelected()) { rewardsPageCheck.setSelected(false); statPageCheck.setSelected(false); perkPageCheck.setSelected(false); challengePageCheck.setSelected(false); calendarPageCheck.setSelected(false); } updateUIState.run(); });
@@ -312,6 +331,8 @@ public class SectionEditDialog {
                 // --- NEW: Load preset lock state ---
                 lockCompletedCheck.setSelected(p.isLockCompletedTasks());
                 enableCategoriesCheck.setSelected(p.isEnableCategories());
+                autoStyleCategoryCheck.setSelected(p.isAutoStyleOnCategoryDrop());
+                allowNotesCheck.setSelected(p.isAllowNotes());
                 preventEditingSpinner.getValueFactory().setValue(p.getPreventEditingHours());
 
                 updateUIState.run();
@@ -348,6 +369,8 @@ public class SectionEditDialog {
                 // --- NEW: Save preset lock state ---
                 newPreset.setLockCompletedTasks(lockCompletedCheck.isSelected());
                 newPreset.setEnableCategories(enableCategoriesCheck.isSelected());
+                newPreset.setAutoStyleOnCategoryDrop(autoStyleCategoryCheck.isSelected());
+                newPreset.setAllowNotes(allowNotesCheck.isSelected());
                 newPreset.setPreventEditingHours(preventEditingSpinner.getValue());
 
                 appStats.getSectionPresets().add(newPreset); presetBox.getItems().add(newPreset); presetBox.setValue(newPreset);
@@ -406,6 +429,8 @@ public class SectionEditDialog {
 
                 // --- Categories toggle ---
                 config.setEnableCategories(enableCategoriesCheck.isSelected());
+                config.setAutoStyleOnCategoryDrop(autoStyleCategoryCheck.isSelected());
+                config.setAllowNotes(allowNotesCheck.isSelected());
 
                 if (isNew) appStats.getSections().add(config);
                 onSave.run();

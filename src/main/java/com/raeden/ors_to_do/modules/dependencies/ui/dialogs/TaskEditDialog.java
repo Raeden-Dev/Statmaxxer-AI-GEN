@@ -55,7 +55,9 @@ public class TaskEditDialog {
         boolean hasSubTasks = task.getSubTasks() != null && !task.getSubTasks().isEmpty();
         boolean sectionAllowsLinks = config == null || config.isEnableLinkCards();
 
-        if (!sectionAllowsLinks || hasSubTasks || task.isOptional()) {
+        // Link cards may now coexist with sub-tasks / sub-task links, so sub-tasks no longer
+        // disable the toggle — only sections that forbid link cards or optional tasks do.
+        if (!sectionAllowsLinks || task.isOptional()) {
             linkCardCheck.setDisable(true);
             linkCardCheck.setSelected(false);
             linkCardCheck.setText("Is Link Card? (Disabled)");
@@ -126,6 +128,25 @@ public class TaskEditDialog {
             }
         }
 
+        // --- NEW: Notes Card toggle (only when the section opts in via "Allow Notes") ---
+        boolean sectionAllowsNotes = config != null && config.isAllowNotes() && !config.isNotesPage();
+        CheckBox noteCardCheck = new CheckBox("Is Notes Card?");
+        noteCardCheck.setStyle("-fx-text-fill: #C586C0; -fx-font-weight: bold;");
+        noteCardCheck.setSelected(sectionAllowsNotes && task.isNoteCard());
+        if (sectionAllowsNotes) {
+            Label noteHint = new Label("Behaves like a note: a pin replaces the checkbox and it never counts as completed.");
+            noteHint.setWrapText(true);
+            noteHint.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
+            grid.add(noteCardCheck, 0, rowIdx.get());
+            grid.add(noteHint, 1, rowIdx.getAndIncrement());
+            // A note card starts with the mutually-exclusive modes locked off.
+            if (noteCardCheck.isSelected()) {
+                linkCardCheck.setSelected(false); linkCardCheck.setDisable(true);
+                repeatingTaskCheck.setSelected(false); repeatingTaskCheck.setDisable(true); repBox.setVisible(false);
+                descCardCheck.setSelected(false); descCardCheck.setDisable(true);
+            }
+        }
+
         // --- NEW: Category field (only shown when the section opts in via "Enable Categories") ---
         TextField categoryField = null;
         if (config != null && config.isEnableCategories()) {
@@ -155,7 +176,7 @@ public class TaskEditDialog {
         }
         final TextField categoryFieldFinal = categoryField;
 
-        // Ensure Mutually Exclusive Link vs Repeating vs Description Logic
+        // Ensure Mutually Exclusive Link vs Repeating vs Description vs Notes Logic
         linkCardCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
                 repeatingTaskCheck.setSelected(false);
@@ -163,9 +184,12 @@ public class TaskEditDialog {
                 repBox.setVisible(false);
                 descCardCheck.setSelected(false);
                 descCardCheck.setDisable(true);
+                noteCardCheck.setSelected(false);
+                noteCardCheck.setDisable(true);
             } else {
                 if (sectionAllowsRepeating && !hasSubTasks) repeatingTaskCheck.setDisable(false);
                 if (sectionAllowsDescription && !hasSubTasks) descCardCheck.setDisable(false);
+                if (sectionAllowsNotes) noteCardCheck.setDisable(false);
             }
         });
 
@@ -176,9 +200,12 @@ public class TaskEditDialog {
                 linkCardCheck.setDisable(true);
                 descCardCheck.setSelected(false);
                 descCardCheck.setDisable(true);
+                noteCardCheck.setSelected(false);
+                noteCardCheck.setDisable(true);
             } else {
-                if (sectionAllowsLinks && !hasSubTasks && !task.isOptional()) linkCardCheck.setDisable(false);
+                if (sectionAllowsLinks && !task.isOptional()) linkCardCheck.setDisable(false);
                 if (sectionAllowsDescription && !hasSubTasks) descCardCheck.setDisable(false);
+                if (sectionAllowsNotes) noteCardCheck.setDisable(false);
             }
         });
 
@@ -187,9 +214,23 @@ public class TaskEditDialog {
             if (newVal) {
                 linkCardCheck.setSelected(false); linkCardCheck.setDisable(true);
                 repeatingTaskCheck.setSelected(false); repeatingTaskCheck.setDisable(true); repBox.setVisible(false);
+                noteCardCheck.setSelected(false); noteCardCheck.setDisable(true);
             } else {
-                if (sectionAllowsLinks && !hasSubTasks && !task.isOptional()) linkCardCheck.setDisable(false);
+                if (sectionAllowsLinks && !task.isOptional()) linkCardCheck.setDisable(false);
                 if (sectionAllowsRepeating && !hasSubTasks) repeatingTaskCheck.setDisable(false);
+                if (sectionAllowsNotes) noteCardCheck.setDisable(false);
+            }
+        });
+
+        noteCardCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                linkCardCheck.setSelected(false); linkCardCheck.setDisable(true);
+                repeatingTaskCheck.setSelected(false); repeatingTaskCheck.setDisable(true); repBox.setVisible(false);
+                descCardCheck.setSelected(false); descCardCheck.setDisable(true);
+            } else {
+                if (sectionAllowsLinks && !task.isOptional()) linkCardCheck.setDisable(false);
+                if (sectionAllowsRepeating && !hasSubTasks) repeatingTaskCheck.setDisable(false);
+                if (sectionAllowsDescription && !hasSubTasks) descCardCheck.setDisable(false);
             }
         });
 
@@ -252,6 +293,10 @@ public class TaskEditDialog {
                 if (sectionAllowsDescription) {
                     task.setDescriptionCard(descCardCheck.isSelected());
                     task.setDescriptionContent(descContentField.getText() == null ? "" : descContentField.getText());
+                }
+
+                if (sectionAllowsNotes) {
+                    task.setNoteCard(noteCardCheck.isSelected());
                 }
 
                 if (categoryFieldFinal != null) {

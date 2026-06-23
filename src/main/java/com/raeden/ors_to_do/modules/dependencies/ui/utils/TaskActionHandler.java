@@ -282,11 +282,15 @@ public class TaskActionHandler {
         if (!hasAnyPenalty) return false;
 
         task.setPenaltyApplied(true);
-        appStats.setGlobalScore(appStats.getGlobalScore() - task.getPenaltyPoints());
+        // Clamp the global score at zero so daily miss penalties can never push it negative.
+        int scoreBefore = appStats.getGlobalScore();
+        int scoreAfter = Math.max(0, scoreBefore - task.getPenaltyPoints());
+        appStats.setGlobalScore(scoreAfter);
+        int scoreDelta = scoreAfter - scoreBefore;
 
         String missSource = "Missed: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent());
-        if (task.getPenaltyPoints() != 0) {
-            appStats.recordStatChange(StatLedgerEntry.GLOBAL_SCORE, -task.getPenaltyPoints(), "pts", missSource);
+        if (scoreDelta != 0) {
+            appStats.recordStatChange(StatLedgerEntry.GLOBAL_SCORE, scoreDelta, "pts", missSource);
         }
 
         if (hasStatPenalties && appStats.isGlobalStatsEnabled()) {

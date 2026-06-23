@@ -58,6 +58,10 @@ public class TaskItem implements Serializable {
     private boolean isDescriptionCard = false;
     private String descriptionContent = "";
 
+    // --- Notes card: an individual card that behaves like a note (pin instead of checkbox, never
+    // completes), available on non-Notes sections that have "Allow Notes" turned on. ---
+    private boolean isNoteCard = false;
+
     private boolean isChallengeCard = false;
     private int perkLevel = 0;
     private int weeksMaintained = 0;
@@ -246,6 +250,9 @@ public class TaskItem implements Serializable {
 
     public boolean isDescriptionCard() { return isDescriptionCard; }
     public void setDescriptionCard(boolean descriptionCard) { this.isDescriptionCard = descriptionCard; }
+
+    public boolean isNoteCard() { return isNoteCard; }
+    public void setNoteCard(boolean noteCard) { this.isNoteCard = noteCard; }
 
     public String getDescriptionContent() { return descriptionContent == null ? "" : descriptionContent; }
     public void setDescriptionContent(String descriptionContent) { this.descriptionContent = descriptionContent; }

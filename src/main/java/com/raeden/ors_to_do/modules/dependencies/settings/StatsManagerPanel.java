@@ -14,7 +14,9 @@ import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class StatsManagerPanel extends VBox {
     private VBox existingStatsBox;
@@ -30,8 +32,18 @@ public class StatsManagerPanel extends VBox {
         this.refreshCallback = refreshCallback;
 
         setStyle("-fx-border-color: #B5CEA8; -fx-border-width: 1; -fx-padding: 15; -fx-border-radius: 5;");
-        Label header = new Label("Stats Configuration");
-        header.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #B5CEA8;");
+        Label headerLabel = new Label("Stats Configuration");
+        headerLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #B5CEA8;");
+
+        // "Base Stats" sits in the header row so it lands just before the section's "Hide" toggle
+        // (which is pinned to the panel's top-right corner by the collapsible wrapper).
+        Button baseStatsBtn = new Button("⚖ Base Stats");
+        baseStatsBtn.setStyle("-fx-background-color: #2D2D30; -fx-border-color: #B5CEA8; -fx-border-radius: 4; -fx-background-radius: 4; -fx-text-fill: #B5CEA8; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 3 10;");
+        baseStatsBtn.setTooltip(new Tooltip("Set a baseline value per stat and reset stats back to it."));
+        baseStatsBtn.setOnAction(e -> showBaseStatsDialog());
+
+        HBox header = new HBox(12, headerLabel, baseStatsBtn);
+        header.setAlignment(Pos.CENTER_LEFT);
 
         descLabel = new Label();
 
@@ -100,6 +112,22 @@ public class StatsManagerPanel extends VBox {
                 renderExistingStats();
             });
 
+            Button resetAtrophyBtn = new Button("⏳");
+            resetAtrophyBtn.setStyle("-fx-background-color: #3E3E42; -fx-text-fill: white; -fx-cursor: hand;");
+            boolean atrophyOff = stat.getAtrophyDays() <= 0;
+            resetAtrophyBtn.setDisable(atrophyOff);
+            resetAtrophyBtn.setTooltip(new Tooltip(atrophyOff
+                    ? "Atrophy disabled for this stat."
+                    : "Reset this stat's atrophy timer (counts inactivity from today)."));
+            resetAtrophyBtn.setOnAction(e -> {
+                appStats.getLastStatGainDates().put(stat.getId(), java.time.LocalDate.now());
+                StorageManager.saveStats(appStats);
+                Alert a = new Alert(Alert.AlertType.INFORMATION, "Atrophy timer for '" + stat.getName() + "' has been reset.", ButtonType.OK);
+                a.setHeaderText("Atrophy Timer Reset");
+                TaskDialogs.styleDialog(a);
+                a.show();
+            });
+
             Button editBtn = new Button("Edit");
             editBtn.setStyle("-fx-background-color: #0E639C; -fx-text-fill: white; -fx-cursor: hand;");
             editBtn.setOnAction(e -> showStatDialog(stat));
@@ -119,10 +147,144 @@ public class StatsManagerPanel extends VBox {
                 });
             });
 
-            btnBox.getChildren().addAll(upBtn, downBtn, editBtn, removeBtn);
-            row.getChildren().addAll(badgePreview, spacer, btnBox);
+            btnBox.getChildren().addAll(upBtn, downBtn, resetAtrophyBtn, editBtn, removeBtn);
+
+            // Atrophy countdown is shown only when this stat actually decays; otherwise it's hidden.
+            Label atrophyStatus = buildAtrophyStatus(stat);
+            if (atrophyStatus != null) {
+                row.getChildren().addAll(badgePreview, atrophyStatus, spacer, btnBox);
+            } else {
+                row.getChildren().addAll(badgePreview, spacer, btnBox);
+            }
             existingStatsBox.getChildren().add(row);
         }
+    }
+
+    /**
+     * Builds the per-stat atrophy countdown label: how long until this stat starts decaying, or its
+     * current status. Returns {@code null} when the stat has no atrophy configured, so the caller can
+     * omit the label entirely.
+     */
+    private Label buildAtrophyStatus(CustomStat stat) {
+        if (stat.getAtrophyDays() <= 0) return null;
+
+        String text;
+        String color;
+        if (stat.getCurrentAmount() <= 0) {
+            // Atrophy only drains a stat above zero — nothing to decay here.
+            text = "⏳ No decay (stat at 0)";
+            color = "#858585";
+        } else {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            java.time.LocalDate lastGain = appStats.getLastStatGainDates().getOrDefault(stat.getId(), today);
+            long daysSinceGain = java.time.temporal.ChronoUnit.DAYS.between(lastGain, today);
+            long remaining = stat.getAtrophyDays() - daysSinceGain;
+
+            if (remaining <= 0) {
+                text = "⚠ Atrophy due (decays on next daily reset)";
+                color = "#FF6666";
+            } else if (remaining == 1) {
+                text = "⏳ Atrophies tomorrow";
+                color = "#DCDCAA";
+            } else {
+                text = "⏳ Atrophies in " + remaining + " days";
+                color = remaining <= 2 ? "#DCDCAA" : "#6A9955";
+            }
+        }
+
+        Label lbl = new Label(text);
+        lbl.setMinWidth(Region.USE_PREF_SIZE);
+        lbl.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 11px;");
+        Tooltip.install(lbl, new Tooltip("Loses value after " + stat.getAtrophyDays()
+                + " day(s) of inactivity.\nComplete a task that grants this stat to reset the timer."));
+        return lbl;
+    }
+
+    /**
+     * "Base Stats" dialog: set a baseline value per stat and snap any stat back to its baseline.
+     * Base values are persisted on each {@link CustomStat}; the per-row "Reset to Base" button
+     * immediately sets the stat's current value to its (possibly just-edited) baseline.
+     */
+    private void showBaseStatsDialog() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Base Stats");
+        TaskDialogs.styleDialog(dialog);
+
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+
+        Label info = new Label("Set a baseline value for each stat. \"Reset to Base\" snaps that stat's current value back to its baseline.");
+        info.setWrapText(true);
+        info.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 12px;");
+        content.getChildren().add(info);
+
+        if (appStats.getCustomStats().isEmpty()) {
+            Label none = new Label("No stats defined yet. Create a stat first.");
+            none.setStyle("-fx-text-fill: #858585;");
+            content.getChildren().add(none);
+        }
+
+        Map<String, Spinner<Integer>> spinners = new HashMap<>();
+        for (CustomStat stat : appStats.getCustomStats()) {
+            HBox row = new HBox(10);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setStyle("-fx-background-color: #2D2D30; -fx-padding: 8; -fx-background-radius: 4; -fx-border-color: #3E3E42; -fx-border-radius: 4;");
+
+            Label name = new Label((stat.getIconSymbol() != null && !stat.getIconSymbol().equals("None") ? stat.getIconSymbol() + " " : "") + stat.getName());
+            name.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
+            name.setPrefWidth(130);
+
+            Label currentLbl = new Label("Current: " + stat.getCurrentAmount());
+            currentLbl.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
+            currentLbl.setPrefWidth(95);
+
+            Label baseLbl = new Label("Base:");
+            baseLbl.setStyle("-fx-text-fill: #B5CEA8;");
+            Spinner<Integer> baseSpinner = new Spinner<>(0, 999999999, Math.max(0, stat.getBaseValue()));
+            baseSpinner.setEditable(true);
+            baseSpinner.setPrefWidth(120);
+            spinners.put(stat.getId(), baseSpinner);
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Button resetBtn = new Button("↩ Reset to Base");
+            resetBtn.setStyle("-fx-background-color: #0E639C; -fx-text-fill: white; -fx-cursor: hand;");
+            resetBtn.setOnAction(e -> {
+                int base = baseSpinner.getValue();
+                stat.setBaseValue(base);
+                int cap = stat.getEffectiveMaxCap(appStats.getActiveDebuffs());
+                int target = (cap > 0) ? Math.min(base, cap) : base;
+                stat.setCurrentAmount(Math.max(0, target));
+                stat.setCurrentExp(0);
+                if (stat.getCurrentAmount() > stat.getMaxLevelReached()) stat.setMaxLevelReached(stat.getCurrentAmount());
+                StorageManager.saveStats(appStats);
+                currentLbl.setText("Current: " + stat.getCurrentAmount());
+            });
+
+            row.getChildren().addAll(name, currentLbl, baseLbl, baseSpinner, spacer, resetBtn);
+            content.getChildren().add(row);
+        }
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefSize(580, 480);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
+        scrollPane.setBorder(Border.EMPTY);
+
+        dialog.getDialogPane().setContent(scrollPane);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        dialog.showAndWait().ifPresent(res -> {
+            if (res == ButtonType.OK) {
+                for (CustomStat stat : appStats.getCustomStats()) {
+                    Spinner<Integer> spn = spinners.get(stat.getId());
+                    if (spn != null) stat.setBaseValue(spn.getValue());
+                }
+                StorageManager.saveStats(appStats);
+                renderExistingStats();
+            }
+        });
     }
 
     private void showStatDialog(CustomStat stat) {

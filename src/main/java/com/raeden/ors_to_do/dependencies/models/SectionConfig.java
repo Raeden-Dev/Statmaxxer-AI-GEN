@@ -84,6 +84,14 @@ public class SectionConfig implements Serializable {
     // --- NEW: per-section category support
     private boolean enableCategories = false;
 
+    // --- NEW: when on, moving a completely unstyled card into a category copies that category's
+    // icon / colour / style onto the card (one-way, only if the card has no styling of its own). ---
+    private boolean autoStyleOnCategoryDrop = false;
+
+    // --- NEW: when on, any card in this section can be converted into a notes card (pin + no
+    // completion) from its edit dialog, even though the section itself isn't a Notes page. ---
+    private boolean allowNotes = false;
+
     /**
      * Optional visual customization for category bars. Keyed by category name. Categories without
      * a matching entry render in the default dark theme. Kept as a list (not a map) for clean
@@ -395,6 +403,12 @@ public class SectionConfig implements Serializable {
 
     public boolean isEnableCategories() { return enableCategories; }
     public void setEnableCategories(boolean enableCategories) { this.enableCategories = enableCategories; }
+
+    public boolean isAutoStyleOnCategoryDrop() { return autoStyleOnCategoryDrop; }
+    public void setAutoStyleOnCategoryDrop(boolean autoStyleOnCategoryDrop) { this.autoStyleOnCategoryDrop = autoStyleOnCategoryDrop; }
+
+    public boolean isAllowNotes() { return allowNotes; }
+    public void setAllowNotes(boolean allowNotes) { this.allowNotes = allowNotes; }
 
     public List<CategoryStyle> getCategoryStyles() {
         if (categoryStyles == null) categoryStyles = new ArrayList<>();

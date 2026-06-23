@@ -17,6 +17,9 @@ public class CustomStat implements Serializable {
     private int currentAmount = 0;
     private String description = "";
 
+    /** Baseline value this stat is reset to via the "Base Stats" dialog. Defaults to 0. */
+    private int baseValue = 0;
+
     // --- FIXED: Increased default max cap to 10 Million for money tracking ---
     private int maxCap = 10000000;
 
@@ -78,6 +81,8 @@ public class CustomStat implements Serializable {
     public void setTextColor(String textColor) { this.textColor = textColor; }
     public int getCurrentAmount() { return currentAmount; }
     public void setCurrentAmount(int currentAmount) { this.currentAmount = currentAmount; }
+    public int getBaseValue() { return baseValue; }
+    public void setBaseValue(int baseValue) { this.baseValue = baseValue; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public int getMaxCap() { return maxCap; }
