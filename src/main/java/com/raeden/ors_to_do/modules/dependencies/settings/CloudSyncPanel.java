@@ -37,7 +37,8 @@ public class CloudSyncPanel extends VBox {
         header.setStyle("-fx-text-fill: #8AB4F8; -fx-font-size: 16px; -fx-font-weight: bold;");
 
         Label desc = new Label("Save and sync all your data to a \"" + GoogleDriveSyncManager.DATA_FOLDER_NAME
-                + "\" folder in your Google Drive. Syncing is asynchronous — no USB or manual file transfer needed.");
+                + "\" folder in your Google Drive. Two-way and asynchronous — a new device pulls your data down, "
+                + "and a timestamped backup is written to \"cloud_sync_backups\" before anything is overwritten.");
         desc.setWrapText(true);
         desc.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 12px;");
 

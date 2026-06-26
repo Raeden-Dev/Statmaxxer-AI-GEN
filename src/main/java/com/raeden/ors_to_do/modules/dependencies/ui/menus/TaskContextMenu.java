@@ -370,39 +370,45 @@ public class TaskContextMenu {
     }
 
     /**
-     * When the section has "Auto-Style on Category" enabled and the card is completely unstyled,
-     * copy the target category's icon and colours onto the card so it visually adopts the category
-     * it was just moved into. One-way and non-destructive: a card with any styling of its own is
-     * left untouched.
+     * When the section has "Auto-Style on Category" enabled, copy the target category's icon and
+     * colours onto the card so it visually adopts the category it was moved into. This forcibly
+     * overwrites any existing styling on the card — including recolouring the small side rectangle.
      */
     public static void applyCategoryAutoStyle(TaskItem task, SectionConfig config) {
         if (config == null || !config.isAutoStyleOnCategoryDrop()) return;
         String cat = task.getCategoryName();
         if (cat == null || cat.trim().isEmpty()) return;
-        if (!isCompletelyUnstyled(task)) return;
 
         CategoryStyle style = config.findCategoryStyle(cat);
-        if (style == null) return;
+        applyCategoryStyleTo(task, style);
+    }
 
-        if (style.getBackgroundColor() != null) task.setColorHex(style.getBackgroundColor());
-        if (style.getBorderColor() != null) task.setCustomOutlineColor(style.getBorderColor());
+    /**
+     * Forcibly copies a category's icon and colours onto a single card — including recolouring the
+     * small side rectangle. Used by both the auto-style-on-move path and the category header's
+     * "Sync Style" action. No-op when {@code style} is null.
+     */
+    public static void applyCategoryStyleTo(TaskItem task, CategoryStyle style) {
+        if (task == null || style == null) return;
+
+        task.setColorHex(style.getBackgroundColor());
+        task.setCustomOutlineColor(style.getBorderColor());
+
+        // The small side rectangle reads from customSideboxColor — give it the category's accent
+        // colour (border first, then icon/text/background) so it no longer stays white.
+        task.setCustomSideboxColor(firstNonBlank(style.getBorderColor(), style.getIconColor(),
+                style.getTextColor(), style.getBackgroundColor()));
+
         if (style.getIconSymbol() != null && !"None".equals(style.getIconSymbol())) {
             task.setIconSymbol(style.getIconSymbol());
             task.setIconColor(style.getIconColor() != null ? style.getIconColor() : style.getTextColor());
         }
     }
 
-    /** True when the card carries no custom styling of its own (background, outline, sidebox, icon). */
-    private static boolean isCompletelyUnstyled(TaskItem task) {
-        boolean noBg = isBlankOrTransparent(task.getColorHex());
-        boolean noOutline = isBlankOrTransparent(task.getCustomOutlineColor());
-        boolean noSidebox = isBlankOrTransparent(task.getCustomSideboxColor());
-        boolean noIcon = task.getIconSymbol() == null || task.getIconSymbol().isBlank() || "None".equals(task.getIconSymbol());
-        boolean noIconColor = task.getIconColor() == null || task.getIconColor().isBlank();
-        return noBg && noOutline && noSidebox && noIcon && noIconColor;
-    }
-
-    private static boolean isBlankOrTransparent(String color) {
-        return color == null || color.isBlank() || "transparent".equalsIgnoreCase(color);
+    private static String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (v != null && !v.isBlank() && !"transparent".equalsIgnoreCase(v)) return v;
+        }
+        return null;
     }
 }

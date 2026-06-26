@@ -36,6 +36,15 @@ All notable changes to the project are recorded here, newest first. Dates use IS
     Until you add a "Desktop app" OAuth `client_secret.json` to the data folder (renamed to
     `google_client_secret.json`), Cloud Sync shows a clear **"Not configured"** state and the rest of
     the app is unaffected. Step-by-step instructions ship in `google_drive_setup.txt`.
+  - The card shows the **connected account email** and the **last sync time**, and the app runs a
+    sync **on startup**.
+  - Sync is **two-way and safe**: a per-file marker tracks what changed on each side, so a fresh
+    device **pulls** your data down instead of overwriting Drive, and a device that still holds the
+    real data **pushes** it back up (resolving the ambiguous/first-sync case by keeping the larger
+    database). **Before any database is overwritten, a timestamped backup is written to
+    `cloud_sync_backups/`.** Save-triggered syncs are push-only (they never replace the database
+    you're editing mid-session); pulls happen on connect, startup, and "Sync Now", and reload the UI
+    when newer data arrives.
 - **Per-stat atrophy reset + countdown.** Each row in Stat Configuration gains a **⏳** button that
   resets just that stat's atrophy timer, plus an inline countdown showing how long until the stat
   starts decaying (or "Atrophy due" / "stat at 0" status). The countdown is hidden for stats with no
@@ -52,6 +61,24 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 ### Changed / Fixed
 - **Score can no longer go negative from daily penalties.** Missed-task penalties now clamp the
   global score at zero, and the stat ledger records the actual (clamped) change.
+- **Cloud Sync now decides by actual content, not timestamps.** Change detection uses a **content
+  checksum (MD5)** — the local file's hash vs Drive's `md5Checksum` vs the hash agreed at the last
+  sync — instead of file modified-times (the app rewrites its DB on open/rollover, so timestamps
+  always looked "changed"). A sync now: does **nothing** when the two copies are byte-identical;
+  **pushes** when only the local copy has new content; **pulls** (and reloads) when only the remote
+  has new content; on a true conflict the remote wins and the local copy is backed up first. This
+  stops redundant uploads/downloads and reliably propagates every card addition between devices.
+  On-save pushes likewise upload only when local content actually changed and the remote isn't ahead.
+- **Auto-Style on Category** now also recolours the card's small side rectangle, and **forcibly
+  overwrites** any existing card styling with the category's icon/colours (previously it only styled
+  cards that had no styling of their own).
+- **"Sync Style" on a category.** A category header's right-click menu gains **Sync Style**, which
+  applies that category's icon/colours to every card in the category at once.
+- **Drag a card onto a category header** to move it into that category (dropping on the
+  "Uncategorized" header clears the card's category). Honours **Auto-Style on Category** just like the
+  "Move to Category" menu.
+- **Right-clicking a category header** no longer collapses/expands it — only a left-click toggles the
+  group; right-click just opens the customise menu.
 
 ## v1.472 — 2026-06-14
 

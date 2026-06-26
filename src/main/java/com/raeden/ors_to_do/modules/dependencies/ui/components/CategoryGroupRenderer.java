@@ -179,9 +179,47 @@ public final class CategoryGroupRenderer {
         HBox row = new HBox(6, chevron, titleBox, spacer, gearBtn);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(6, 8, 4, 4));
-        row.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 4; -fx-border-color: " + border + "; -fx-border-radius: 4; -fx-cursor: hand;");
+        String rowStyle = "-fx-background-color: " + bg + "; -fx-background-radius: 4; -fx-border-color: " + border + "; -fx-border-radius: 4; -fx-cursor: hand;";
+        row.setStyle(rowStyle);
+
+        // --- Drag a card onto this header to move it into this category. ---
+        // Cards put their task id on the dragboard (see TaskCardStyleHelper#setupDragAndDrop).
+        final boolean isUncategorized = name.equals(Lang.CATEGORY_UNCATEGORIZED.get());
+        row.setOnDragOver(e -> {
+            if (e.getGestureSource() != row && e.getDragboard().hasString()) {
+                e.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+            }
+            e.consume();
+        });
+        row.setOnDragEntered(e -> {
+            if (e.getDragboard().hasString()) row.setStyle(rowStyle + " -fx-border-color: #569CD6; -fx-border-width: 2;");
+        });
+        row.setOnDragExited(e -> row.setStyle(rowStyle));
+        row.setOnDragDropped(e -> {
+            javafx.scene.input.Dragboard db = e.getDragboard();
+            boolean success = false;
+            if (db.hasString()) {
+                String draggedId = db.getString();
+                TaskItem dragged = null;
+                for (TaskItem t : globalDatabase) {
+                    if (t.getId().equals(draggedId)) { dragged = t; break; }
+                }
+                if (dragged != null && config.getId().equals(dragged.getSectionId())) {
+                    dragged.setCategoryName(isUncategorized ? null : name);
+                    // Mirror the "Move to Category" menu: auto-style the card if the section opts in.
+                    com.raeden.ors_to_do.modules.dependencies.ui.menus.TaskContextMenu.applyCategoryAutoStyle(dragged, config);
+                    StorageManager.saveTasks(globalDatabase);
+                    success = true;
+                    if (onStyleChanged != null) onStyleChanged.run();
+                }
+            }
+            e.setDropCompleted(success);
+            e.consume();
+        });
 
         row.setOnMouseClicked(e -> {
+            // Only a left-click collapses/expands — right-click is reserved for the context menu.
+            if (e.getButton() != javafx.scene.input.MouseButton.PRIMARY) return;
             // Update chevron locally so the visual matches the new state on the next paint.
             chevron.setText("▶".equals(chevron.getText()) ? "▼" : "▶");
             onToggle.run();
@@ -191,7 +229,25 @@ public final class CategoryGroupRenderer {
         ContextMenu ctx = new ContextMenu();
         MenuItem customizeItem = new MenuItem(Lang.CATEGORY_CUSTOMIZE_MENU.get());
         customizeItem.setOnAction(e -> openStyleEditor.run());
-        ctx.getItems().add(customizeItem);
+
+        // "Sync Style" re-applies this category's style to every card in the category.
+        MenuItem syncStyleItem = new MenuItem("Sync Style");
+        syncStyleItem.setDisable(style == null);
+        syncStyleItem.setOnAction(e -> {
+            CategoryStyle catStyle = config.findCategoryStyle(name);
+            if (catStyle == null) return;
+            for (TaskItem t : globalDatabase) {
+                if (!config.getId().equals(t.getSectionId())) continue;
+                String c = t.getCategoryName();
+                if (c != null && c.trim().equals(name)) {
+                    com.raeden.ors_to_do.modules.dependencies.ui.menus.TaskContextMenu.applyCategoryStyleTo(t, catStyle);
+                }
+            }
+            StorageManager.saveTasks(globalDatabase);
+            if (onStyleChanged != null) onStyleChanged.run();
+        });
+
+        ctx.getItems().addAll(customizeItem, syncStyleItem);
         row.setOnContextMenuRequested(e -> {
             ctx.show(row, e.getScreenX(), e.getScreenY());
             e.consume();

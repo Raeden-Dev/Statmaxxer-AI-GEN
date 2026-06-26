@@ -37,8 +37,7 @@ build/
 ### Mac OS ###
 .DS_Store
 /TaskTracker/
-/TaskTracker_v1.43/
-/TaskTracker_v1.45/
-/TaskTracker_v1.472/
 /TaskTracker_v1.465/
-/TaskTracker_v1.47/
+/TaskTracker_v1.472/
+/TaskTracker_v1.481/
+/TaskTracker_v1.483/

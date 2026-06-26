@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class TaskTrackerApp extends Application {
-    public static final String APP_VERSION = "v1.48";
+    public static final String APP_VERSION = "v1.483";
 
     private List<TaskItem> taskDatabase;
     private AppStats appStats;
@@ -187,7 +187,9 @@ public class TaskTrackerApp extends Application {
             GlobalActivityTracker.init();
             // Mirror every local data write to Google Drive (no-op until an account is connected).
             StorageManager.setChangeListener(GoogleDriveSyncManager::onDataChanged);
-            // Push the current local data to Drive once on launch (async; no-op when not connected).
+            // When a sync pulls newer remote data down, swap it in and rebuild the UI (on the FX thread).
+            GoogleDriveSyncManager.setReloadHandler(pendings -> Platform.runLater(() -> applyDownloadedData(pendings)));
+            // Full bidirectional sync once on launch (async; no-op when not connected).
             GoogleDriveSyncManager.syncOnStartup();
             if (firstLaunch) {
                 com.raeden.ors_to_do.modules.dependencies.settings.SetupWizard.show(appStats, () -> {
@@ -296,6 +298,53 @@ public class TaskTrackerApp extends Application {
             }
             MAIN_STAGE.setAlwaysOnTop(appStats.isAlwaysOnTop());
         });
+    }
+
+    /**
+     * Applies data pulled from Google Drive: closes the live DB, swaps each downloaded file in over
+     * the local copy (the manager has already backed up what's being replaced), then reloads and
+     * rebuilds the UI from the new data. Runs on the FX thread so no save can interleave with the
+     * file swap.
+     */
+    private void applyDownloadedData(java.util.List<GoogleDriveSyncManager.PendingDownload> pendings) {
+        if (pendings == null || pendings.isEmpty()) return;
+
+        // Suppress save-triggered pushes while we swap files out from under the storage layer.
+        StorageManager.setChangeListener(null);
+        showLoading("Loading synced data from Google Drive…");
+
+        StorageManager.close();
+        for (GoogleDriveSyncManager.PendingDownload p : pendings) {
+            try {
+                // Drop any stale SQLite sidecar journals so they can't corrupt the swapped-in DB.
+                for (String suffix : new String[]{"-wal", "-shm", "-journal"}) {
+                    java.io.File sidecar = new java.io.File(p.localFile.getParentFile(), p.localFile.getName() + suffix);
+                    if (sidecar.exists()) //noinspection ResultOfMethodCallIgnored
+                        sidecar.delete();
+                }
+                java.nio.file.Files.move(p.tempFile.toPath(), p.localFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                GoogleDriveSyncManager.recordSynced(p.localFile, p.remoteModifiedMillis);
+            } catch (Exception ex) {
+                System.err.println("[Sync] failed to apply downloaded file " + p.localFile.getName() + ": " + ex.getMessage());
+            }
+        }
+
+        // Reload the active profile's data from the freshly-pulled DB and rebuild everything.
+        taskDatabase = StorageManager.loadTasks();
+        appStats = StorageManager.loadStats();
+        runSilentDataMigration();
+        DailyRolloverManager.processDailyRollover(appStats, taskDatabase);
+
+        buildSession(MAIN_STAGE);
+        if (MAIN_STAGE.getScene() != null) {
+            com.raeden.ors_to_do.modules.dependencies.ui.utils.FontManager.apply(MAIN_STAGE.getScene(), appStats.getTaskFontFamily());
+        }
+
+        // Re-arm the change listener (buildSession does not set it) and only now allow push-on-save,
+        // since the freshly-pulled data is in place.
+        StorageManager.setChangeListener(GoogleDriveSyncManager::onDataChanged);
+        GoogleDriveSyncManager.markInitialSyncComplete();
     }
 
     private void shutdownApp() {
