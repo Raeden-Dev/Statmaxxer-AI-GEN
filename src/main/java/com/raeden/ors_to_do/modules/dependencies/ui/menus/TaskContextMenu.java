@@ -53,6 +53,18 @@ public class TaskContextMenu {
             Clipboard.getSystemClipboard().setContent(content);
         });
 
+        // Description cards keep their body text behind a Copy button; also expose it here so it can
+        // be copied from the right-click menu like any other text.
+        MenuItem copyDescItem = null;
+        if (task.isDescriptionCard() && task.getDescriptionContent() != null && !task.getDescriptionContent().isBlank()) {
+            copyDescItem = new MenuItem("Copy Description Text");
+            copyDescItem.setOnAction(e -> {
+                ClipboardContent content = new ClipboardContent();
+                content.putString(task.getDescriptionContent());
+                Clipboard.getSystemClipboard().setContent(content);
+            });
+        }
+
         MenuItem addSubTaskItem = null;
         if ((config == null || config.isEnableSubTasks()) && !isNoteMode) {
             addSubTaskItem = new MenuItem("Add Sub-tasks");
@@ -158,6 +170,13 @@ public class TaskContextMenu {
             copy.setRepeatingMode(task.isRepeatingMode());
             copy.setRepetitionCount(task.getRepetitionCount());
 
+            // Carry over the remaining card attributes so a duplicate is a true copy.
+            copy.setCategoryName(task.getCategoryName());
+            copy.setDescriptionCard(task.isDescriptionCard());
+            copy.setDescriptionContent(task.getDescriptionContent());
+            copy.setNoteCard(task.isNoteCard());
+            copy.setTargetTimeMinutes(task.getTargetTimeMinutes());
+
             for (SubTask sub : task.getSubTasks()) {
                 copy.getSubTasks().add(new SubTask(sub.getTextContent()));
             }
@@ -243,17 +262,39 @@ public class TaskContextMenu {
                     appStats.getDeletedTaskHistory().add("[" + timestamp + "] " + task.getTextContent());
                     appStats.setLifetimeDeletedTasks(appStats.getLifetimeDeletedTasks() + 1);
 
-                    globalDatabase.remove(task);
-
+                    // Capture enough state to undo: the card's position and which tasks depended on it.
+                    int originalIndex = globalDatabase.indexOf(task);
+                    java.util.List<TaskItem> dependents = new java.util.ArrayList<>();
                     for (TaskItem other : globalDatabase) {
-                        if (other.getDependsOnTaskIds() != null) {
-                            other.getDependsOnTaskIds().remove(task.getId());
+                        if (other.getDependsOnTaskIds() != null && other.getDependsOnTaskIds().contains(task.getId())) {
+                            dependents.add(other);
                         }
+                    }
+
+                    globalDatabase.remove(task);
+                    for (TaskItem other : globalDatabase) {
+                        if (other.getDependsOnTaskIds() != null) other.getDependsOnTaskIds().remove(task.getId());
                     }
 
                     StorageManager.saveTasks(globalDatabase);
                     StorageManager.saveStats(appStats);
                     onUpdate.run();
+
+                    com.raeden.ors_to_do.modules.dependencies.ui.layout.Toast.showUndo(
+                            "Deleted \"" + shorten(task.getTextContent()) + "\"",
+                            () -> {
+                                int idx = Math.min(Math.max(0, originalIndex), globalDatabase.size());
+                                globalDatabase.add(idx, task);
+                                for (TaskItem dep : dependents) {
+                                    if (dep.getDependsOnTaskIds() != null && !dep.getDependsOnTaskIds().contains(task.getId())) {
+                                        dep.getDependsOnTaskIds().add(task.getId());
+                                    }
+                                }
+                                appStats.setLifetimeDeletedTasks(Math.max(0, appStats.getLifetimeDeletedTasks() - 1));
+                                StorageManager.saveTasks(globalDatabase);
+                                StorageManager.saveStats(appStats);
+                                onUpdate.run();
+                            });
                 }
             });
         });
@@ -261,10 +302,9 @@ public class TaskContextMenu {
         contextMenu.getItems().addAll(editItem);
         if (pinItem != null) contextMenu.getItems().add(pinItem);
 
-        contextMenu.getItems().addAll(
-                copyItem,
-                new SeparatorMenuItem()
-        );
+        contextMenu.getItems().add(copyItem);
+        if (copyDescItem != null) contextMenu.getItems().add(copyDescItem);
+        contextMenu.getItems().add(new SeparatorMenuItem());
 
         if (focusLinkItem != null) contextMenu.getItems().addAll(focusLinkItem, new SeparatorMenuItem());
 
@@ -410,5 +450,12 @@ public class TaskContextMenu {
             if (v != null && !v.isBlank() && !"transparent".equalsIgnoreCase(v)) return v;
         }
         return null;
+    }
+
+    /** Trims a task title for display inside a toast. */
+    private static String shorten(String text) {
+        if (text == null) return "task";
+        String t = text.trim();
+        return t.length() > 40 ? t.substring(0, 40) + "…" : t;
     }
 }

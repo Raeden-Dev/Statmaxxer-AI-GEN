@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class TaskTrackerApp extends Application {
-    public static final String APP_VERSION = "v1.483";
+    public static final String APP_VERSION = "v1.485";
 
     private List<TaskItem> taskDatabase;
     private AppStats appStats;

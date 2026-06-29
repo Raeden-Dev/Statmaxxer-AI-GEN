@@ -20,6 +20,103 @@ public class TaskDialogs {
             "None", "★", "☆", "⚡", "⚠", "⚙", "✉", "✎", "✔", "✖", "✚", "♫", "⚑", "⚐", "✂", "⌛", "⌚", "❀", "☾", "☁", "☂", "☃", "♛", "♚", "♞", "☯", "♦", "♣", "♠", "♥", "●", "■", "▲", "▼", "◆", "▶", "◀", "✦", "✧", "❂", "❖", "➤", "➥", "✓", "✗", "🔥", "🚀", "💡", "📌", "🏆"
     };
 
+    /** Fixed width for a colour picker that trails a grow-field, so every dialog row's right edge lines up. */
+    public static final double TRAILING_COLOR_PICKER_WIDTH = 120;
+
+    /**
+     * Applies the project's consistent transparent scrollbar styling and standard sizing to a dialog
+     * scroll pane, replacing the ad-hoc inline CSS that each dialog used to declare.
+     */
+    public static void styleScrollPane(ScrollPane scroll, double prefWidth, double prefHeight) {
+        scroll.setFitToWidth(true);
+        scroll.setPrefSize(prefWidth, prefHeight);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
+        scroll.setBorder(javafx.scene.layout.Border.EMPTY);
+        scroll.getStylesheets().add("data:text/css;base64,"
+                + java.util.Base64.getEncoder().encodeToString(ThemeConstants.TRANSPARENT_SCROLL_CSS.getBytes()));
+    }
+
+    /**
+     * Restricts a text field to whole numbers, preventing typos from being silently swallowed and
+     * zeroed by the {@code Integer.parseInt} call sites. {@code allowNegative} permits a leading "-".
+     */
+    public static void makeIntegerField(TextField field, boolean allowNegative) {
+        String regex = allowNegative ? "-?\\d*" : "\\d*";
+        field.setTextFormatter(new TextFormatter<>(change ->
+                change.getControlNewText().matches(regex) ? change : null));
+    }
+
+    /** Sizes a trailing colour picker to {@link #TRAILING_COLOR_PICKER_WIDTH} for row-edge alignment. */
+    public static ColorPicker trailingColorPicker(ColorPicker picker) {
+        picker.setMinWidth(TRAILING_COLOR_PICKER_WIDTH);
+        picker.setPrefWidth(TRAILING_COLOR_PICKER_WIDTH);
+        picker.setMaxWidth(TRAILING_COLOR_PICKER_WIDTH);
+        return picker;
+    }
+
+    /**
+     * Wires Enter to confirm (OK) and Esc to cancel a custom dialog by tagging the OK button as the
+     * scene default and the Cancel button as the cancel button. (Enter inside a multi-line text area
+     * still inserts a newline, as expected.)
+     */
+    public static void installConfirmCancelShortcuts(Dialog<ButtonType> dialog) {
+        DialogPane pane = dialog.getDialogPane();
+        Button ok = (Button) pane.lookupButton(ButtonType.OK);
+        if (ok != null) ok.setDefaultButton(true);
+        Button cancel = (Button) pane.lookupButton(ButtonType.CANCEL);
+        if (cancel != null) cancel.setCancelButton(true);
+    }
+
+    /**
+     * Adds a type-to-filter search box at the top of a {@link MenuButton} whose entries are
+     * {@link CustomMenuItem}s wrapping a labelled control. Items whose visible text doesn't contain
+     * the query are hidden. Safe to call on any such menu; the search row never hides itself.
+     */
+    public static void addMenuSearch(MenuButton menu, String promptText) {
+        TextField search = new TextField();
+        search.setPromptText(promptText);
+        search.setStyle("-fx-background-color: #1E1E1E; -fx-text-fill: white; -fx-prompt-text-fill: #777777;");
+        CustomMenuItem searchItem = new CustomMenuItem(search);
+        searchItem.setHideOnClick(false);
+
+        java.util.List<MenuItem> entries = new java.util.ArrayList<>(menu.getItems());
+        menu.getItems().add(0, searchItem);
+
+        search.textProperty().addListener((obs, oldV, newV) ->
+                filterMenuItems(entries, newV == null ? "" : newV.trim().toLowerCase()));
+    }
+
+    private static void filterMenuItems(java.util.List<MenuItem> items, String query) {
+        for (MenuItem mi : items) applyMenuFilter(mi, query);
+    }
+
+    /** Recursively hides menu items whose text (or none of whose descendants) match the query. */
+    private static boolean applyMenuFilter(MenuItem mi, String query) {
+        if (mi instanceof Menu) {
+            boolean anyChild = false;
+            for (MenuItem child : ((Menu) mi).getItems()) anyChild |= applyMenuFilter(child, query);
+            boolean show = query.isEmpty() || anyChild || matchText(((Menu) mi).getText(), query);
+            mi.setVisible(show);
+            return show;
+        }
+        boolean show = query.isEmpty() || matchText(menuItemText(mi), query);
+        mi.setVisible(show);
+        return show;
+    }
+
+    private static boolean matchText(String text, String query) {
+        return text != null && text.toLowerCase().contains(query);
+    }
+
+    private static String menuItemText(MenuItem mi) {
+        if (mi instanceof Menu) return ((Menu) mi).getText();
+        if (mi instanceof CustomMenuItem) {
+            javafx.scene.Node content = ((CustomMenuItem) mi).getContent();
+            if (content instanceof Labeled) return ((Labeled) content).getText();
+        }
+        return mi.getText();
+    }
+
     public static void showLinkDialog(TaskItem task, TaskLink existingLink, List<TaskItem> globalDatabase, Runnable onUpdate) {
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle(existingLink == null ? "Add Link" : "Edit Link");

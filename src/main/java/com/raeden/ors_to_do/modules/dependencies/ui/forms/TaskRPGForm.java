@@ -5,6 +5,7 @@ import com.raeden.ors_to_do.dependencies.models.CustomStat;
 import com.raeden.ors_to_do.dependencies.models.Debuff;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
+import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import javafx.geometry.Pos;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.CustomMenuItem;
@@ -45,10 +46,12 @@ public class TaskRPGForm {
             rewardField = new TextField(String.valueOf(task.getRewardPoints()));
             rewardField.setPromptText("+ Reward");
             rewardField.setPrefWidth(70);
+            TaskDialogs.makeIntegerField(rewardField, false);
 
             penaltyField = new TextField(String.valueOf(task.getPenaltyPoints()));
             penaltyField.setPromptText("- Penalty (Fail)");
             penaltyField.setPrefWidth(90);
+            TaskDialogs.makeIntegerField(penaltyField, false);
 
             scoreBox.getChildren().addAll(new Label("+"), rewardField, new Label("- (Fail)"), penaltyField);
             grid.add(scoreBox, 1, rowIdx.getAndIncrement());
@@ -57,12 +60,14 @@ public class TaskRPGForm {
         if (config != null && config.isRewardsPage()) {
             costField = new TextField(String.valueOf(task.getCostPoints()));
             costField.setPromptText("Cost");
+            TaskDialogs.makeIntegerField(costField, false);
             grid.add(new Label("Store Cost:"), 0, rowIdx.get());
             grid.add(costField, 1, rowIdx.getAndIncrement());
         }
 
         maxCountField = new TextField(task.getMaxCount() > 0 ? String.valueOf(task.getMaxCount()) : "");
         maxCountField.setPromptText("Target Count (Optional)");
+        TaskDialogs.makeIntegerField(maxCountField, false);
 
         permaLockCheck = new CheckBox("Perma Lock");
         permaLockCheck.setStyle("-fx-text-fill: white;");
@@ -119,6 +124,7 @@ public class TaskRPGForm {
                 }
 
                 updateDebuffMenuText();
+                TaskDialogs.addMenuSearch(debuffMenuBtn, "Search debuffs…");
 
                 grid.add(new Label("Inflict Debuffs:"), 0, rowIdx.get());
                 grid.add(debuffMenuBtn, 1, rowIdx.getAndIncrement());
@@ -169,6 +175,11 @@ public class TaskRPGForm {
                     if (task.getStatPenalties() != null && task.getStatPenalties().containsKey(stat.getId())) {
                         pField.setText(String.valueOf(task.getStatPenalties().get(stat.getId())));
                     }
+
+                    TaskDialogs.makeIntegerField(rField, false);
+                    TaskDialogs.makeIntegerField(cpField, false);
+                    TaskDialogs.makeIntegerField(cField, false);
+                    TaskDialogs.makeIntegerField(pField, false);
 
                     statRewardFields.put(stat.getId(), rField);
                     statCapRewardFields.put(stat.getId(), cpField);

@@ -59,6 +59,20 @@ All notable changes to the project are recorded here, newest first. Dates use IS
   coexist with sub-tasks and sub-task links in the same section.
 
 ### Changed / Fixed
+- **Dialog alignment.** Customization dialogs now line up consistently: the Category style editor's
+  colour pickers and icon dropdown fill the input column (instead of sitting narrow and left-skewed),
+  the card-edit "Randomize Style" button spans the full width, and labels next to multi-line fields
+  (Content, Description, Notes) top-align with their input.
+- **"Work Type" field no longer mislabelled "Category".** In the card editor the work-type field
+  (from the section's "Enable Work Types" toggle) was labelled "Category:", clashing with the
+  separate Categories feature; it now reads "Work Type:".
+- **Number fields reject non-numeric input.** Points, costs, penalties, focus minutes and counter
+  fields now accept digits only, instead of silently zeroing a typo on save.
+- **Duplicate card is now a complete copy.** "Duplicate" also carries over the card's category,
+  description-card text, notes-card flag and required focus time (it already copied styling and stats).
+- **Consistent dialog scrollbars and colour-picker widths.** The card, stat, section and category
+  editors now share one scrollbar style helper, and colour pickers that trail a field use a uniform
+  width so every row's right edge lines up.
 - **Score can no longer go negative from daily penalties.** Missed-task penalties now clamp the
   global score at zero, and the stat ledger records the actual (clamped) change.
 - **Cloud Sync now decides by actual content, not timestamps.** Change detection uses a **content
@@ -77,6 +91,28 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 - **Drag a card onto a category header** to move it into that category (dropping on the
   "Uncategorized" header clears the card's category). Honours **Auto-Style on Category** just like the
   "Move to Category" menu.
+- **Undo for task deletion.** Deleting a card now shows an **Undo** toast at the bottom of the window
+  that restores the card (and the dependencies that pointed at it) to its original position.
+- **Searchable dropdowns.** The **Dependencies** and **Inflict Debuffs** pickers gain a type-to-filter
+  search box, so long lists are quick to navigate.
+- **Cloud Sync: Restore from Backup.** A new button lists the local pre-overwrite backups (with date
+  and size) and rolls one back over the live database — works offline, and backs up the current data
+  first so a restore is itself reversible. A small spinner now shows while a sync/connect is running.
+- **Bulk "Move all cards to…".** A category header's right-click menu can move every card in that
+  category to another category at once.
+- **Keyboard shortcuts in dialogs.** Enter confirms and Esc cancels across the card, category, stat,
+  section, and calendar editors.
+- **Calendar journal: drag to reorder entries.** In a day's entry list (Journal-Only mode), drag a
+  log/event card onto another to rearrange them; the order persists.
+- **Calendar journal: convert log ↔ event.** A journal entry's right-click menu can convert a log into
+  an event (or back) in place, keeping its text and styling.
+- **Calendar style presets.** Both the **Customize Day** dialog and the journal **entry/event** editor
+  gain a "Style Preset" row — save the current icon/colours under a name and re-apply it later from a
+  dropdown. Day-style and entry-style presets are stored separately and persist with your data.
+- **Copy text from read-only displays.** Displayed (non-editable) text can now be copied: journal
+  entries and description cards get a **Copy Text**/**Copy Description Text** menu item, and sub-tasks,
+  sub-task links and perk/challenge descriptions get a right-click **Copy**. (Editable text fields and
+  text areas already supported normal copy/paste.)
 - **Right-clicking a category header** no longer collapses/expands it — only a left-click toggles the
   group; right-click just opens the customise menu.
 

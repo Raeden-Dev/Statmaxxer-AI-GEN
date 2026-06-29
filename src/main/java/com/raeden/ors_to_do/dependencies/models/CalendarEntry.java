@@ -4,15 +4,19 @@ import java.io.Serializable;
 import java.util.UUID;
 
 /**
- * A customizable card attached to a specific calendar day — either a journal entry or an event.
- * Both share the same fields; an event simply renders a small "event" tag. Used by Calendar Page
- * sections in Journal mode (in Journal-Only mode a day can hold multiple of these).
+ * A customizable card attached to a specific calendar day — a journal entry, an event, or a custom
+ * "scenario". Journal entries and events render a fixed "log"/"event" tag; a scenario carries a
+ * user-defined tag label and tag colour. Used by Calendar Page sections in Journal mode (in
+ * Journal-Only mode a day can hold multiple of these).
  */
 public class CalendarEntry implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private String id;
     private boolean event;          // false = journal entry, true = event
+    private boolean scenario;       // true = custom scenario (overrides event/log tag with tagLabel/tagColor)
+    private String tagLabel;        // custom scenario tag text
+    private String tagColor;        // custom scenario tag/accent colour (null -> default)
     private String text = "";
 
     private String bgColor;         // null/"transparent" -> default card background
@@ -33,6 +37,15 @@ public class CalendarEntry implements Serializable {
 
     public boolean isEvent() { return event; }
     public void setEvent(boolean event) { this.event = event; }
+
+    public boolean isScenario() { return scenario; }
+    public void setScenario(boolean scenario) { this.scenario = scenario; }
+
+    public String getTagLabel() { return tagLabel == null ? "" : tagLabel; }
+    public void setTagLabel(String tagLabel) { this.tagLabel = tagLabel; }
+
+    public String getTagColor() { return tagColor == null ? "#569CD6" : tagColor; }
+    public void setTagColor(String tagColor) { this.tagColor = tagColor; }
 
     public String getText() { return text == null ? "" : text; }
     public void setText(String text) { this.text = text; }

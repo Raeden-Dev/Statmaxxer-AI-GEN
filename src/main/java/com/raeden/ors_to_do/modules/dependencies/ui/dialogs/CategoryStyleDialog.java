@@ -62,24 +62,33 @@ public final class CategoryStyleDialog {
         ColorPicker bgPicker = new ColorPicker(Color.web(existing != null && existing.getBackgroundColor() != null ? existing.getBackgroundColor() : DEFAULT_BG));
         ColorPicker borderPicker = new ColorPicker(Color.web(existing != null && existing.getBorderColor() != null ? existing.getBorderColor() : DEFAULT_BORDER));
         ColorPicker textPicker = new ColorPicker(Color.web(existing != null && existing.getTextColor() != null ? existing.getTextColor() : DEFAULT_TEXT));
+        // Fill the input column so every picker lines up with the (full-width) name field.
+        bgPicker.setMaxWidth(Double.MAX_VALUE);
+        borderPicker.setMaxWidth(Double.MAX_VALUE);
+        textPicker.setMaxWidth(Double.MAX_VALUE);
+        nameField.setMaxWidth(Double.MAX_VALUE);
 
         ComboBox<String> iconBox = new ComboBox<>();
         iconBox.getItems().addAll(TaskDialogs.ICON_LIST);
         iconBox.setValue(existing != null && existing.getIconSymbol() != null ? existing.getIconSymbol() : "None");
+        iconBox.setMaxWidth(Double.MAX_VALUE);
 
-        ColorPicker iconColorPicker = new ColorPicker(Color.web(existing != null && existing.getIconColor() != null ? existing.getIconColor() : DEFAULT_ICON_COLOR));
+        ColorPicker iconColorPicker = TaskDialogs.trailingColorPicker(new ColorPicker(Color.web(existing != null && existing.getIconColor() != null ? existing.getIconColor() : DEFAULT_ICON_COLOR)));
+
+        HBox iconRow = new HBox(10, iconBox, iconColorPicker);
+        HBox.setHgrow(iconBox, Priority.ALWAYS);
 
         GridPane grid = new GridPane();
         grid.setHgap(12); grid.setVgap(10); grid.setPadding(new Insets(10));
         ColumnConstraints c1 = new ColumnConstraints(); c1.setMinWidth(140);
-        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS); c2.setFillWidth(true);
         grid.getColumnConstraints().addAll(c1, c2);
 
         grid.add(new Label(Lang.CATEGORY_NAME_LABEL.get()), 0, 0);       grid.add(nameField, 1, 0);
         grid.add(new Label(Lang.CATEGORY_STYLE_BACKGROUND.get()), 0, 1); grid.add(bgPicker, 1, 1);
         grid.add(new Label(Lang.CATEGORY_STYLE_BORDER.get()), 0, 2);     grid.add(borderPicker, 1, 2);
         grid.add(new Label(Lang.CATEGORY_STYLE_TEXT.get()), 0, 3);       grid.add(textPicker, 1, 3);
-        grid.add(new Label(Lang.CATEGORY_STYLE_ICON.get()), 0, 4);       grid.add(new HBox(10, iconBox, iconColorPicker), 1, 4);
+        grid.add(new Label(Lang.CATEGORY_STYLE_ICON.get()), 0, 4);       grid.add(iconRow, 1, 4);
 
         // Randomize button — picks a random hue and derives a cohesive palette around it. Matches
         // the same pattern used in TaskStyleForm / ChallengeConfigDialog so the look is consistent.
@@ -95,12 +104,13 @@ public final class CategoryStyleDialog {
             textPicker.setValue(Color.hsb(hue, 0.5, 0.95));    // light, readable text
             iconColorPicker.setValue(Color.hsb(hue, 0.5, 0.95));
         });
-        grid.add(randomBtn, 1, 5);
+        grid.add(randomBtn, 0, 5, 2, 1);
 
         // Reset button — clears the style entry entirely.
         ButtonType resetBtnType = new ButtonType(Lang.CATEGORY_STYLE_RESET.get(), ButtonBar.ButtonData.LEFT);
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(resetBtnType, ButtonType.OK, ButtonType.CANCEL);
+        TaskDialogs.installConfirmCancelShortcuts(dialog);
 
         ButtonType result = dialog.showAndWait().orElse(ButtonType.CANCEL);
 

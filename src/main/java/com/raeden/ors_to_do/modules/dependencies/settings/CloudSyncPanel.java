@@ -3,15 +3,28 @@ package com.raeden.ors_to_do.modules.dependencies.settings;
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.modules.dependencies.services.GoogleDriveSyncManager;
+import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+
+import java.io.File;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Settings card for Google Drive sync: connect / disconnect a Google account and trigger a manual
@@ -27,6 +40,8 @@ public class CloudSyncPanel extends VBox {
     private final Button connectBtn = new Button("Connect Google Account");
     private final Button disconnectBtn = new Button("Disconnect");
     private final Button syncBtn = new Button("Sync Now");
+    private final Button restoreBtn = new Button("Restore from Backup");
+    private final ProgressIndicator busySpinner = new ProgressIndicator();
 
     public CloudSyncPanel(AppStats appStats) {
         super(12);
@@ -53,9 +68,20 @@ public class CloudSyncPanel extends VBox {
         connectBtn.setStyle("-fx-background-color: #1a3a66; -fx-text-fill: #8AB4F8; -fx-border-color: #4285F4; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-padding: 8 15;");
         disconnectBtn.setStyle("-fx-background-color: #4d1a1a; -fx-text-fill: #FF8A8A; -fx-border-color: #B04545; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-padding: 8 15;");
         syncBtn.setStyle("-fx-background-color: #1a4d33; -fx-text-fill: #4EC9B0; -fx-border-color: #4EC9B0; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-padding: 8 15;");
+        restoreBtn.setStyle("-fx-background-color: #3a2e10; -fx-text-fill: #FFD700; -fx-border-color: #FFD700; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-padding: 8 15;");
+        restoreBtn.setTooltip(new Tooltip("Roll back to a local pre-overwrite backup if a sync loaded the wrong data."));
         HBox.setHgrow(connectBtn, Priority.ALWAYS); connectBtn.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(disconnectBtn, Priority.ALWAYS); disconnectBtn.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(syncBtn, Priority.ALWAYS); syncBtn.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(restoreBtn, Priority.ALWAYS); restoreBtn.setMaxWidth(Double.MAX_VALUE);
+
+        busySpinner.setPrefSize(16, 16);
+        busySpinner.setMaxSize(16, 16);
+        busySpinner.setStyle("-fx-progress-color: #8AB4F8;");
+        busySpinner.setVisible(false);
+        busySpinner.setManaged(false);
+
+        restoreBtn.setOnAction(e -> showRestoreDialog());
 
         connectBtn.setOnAction(e -> {
             setBusy(true, "Opening Google sign-in in your browser…");
@@ -93,13 +119,20 @@ public class CloudSyncPanel extends VBox {
         HBox buttons = new HBox(12, connectBtn, syncBtn, disconnectBtn);
         buttons.setAlignment(Pos.CENTER);
 
+        HBox secondaryButtons = new HBox(12, restoreBtn);
+        secondaryButtons.setAlignment(Pos.CENTER);
+
+        HBox statusRow = new HBox(8, busySpinner, statusLabel);
+        statusRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(statusLabel, Priority.ALWAYS);
+
         Label setupHint = new Label("Not configured? Place your Google \"Desktop app\" OAuth client_secret.json as "
                 + "\"google_client_secret.json\" in the data folder (Data Management → Open Data Folder), then click Connect. "
                 + "See google_drive_setup.txt in the app resources for full steps.");
         setupHint.setWrapText(true);
         setupHint.setStyle("-fx-text-fill: #6A6A6A; -fx-font-size: 11px; -fx-font-style: italic;");
 
-        getChildren().addAll(header, desc, statusLabel, accountLabel, lastSyncLabel, buttons, setupHint);
+        getChildren().addAll(header, desc, statusRow, accountLabel, lastSyncLabel, buttons, secondaryButtons, setupHint);
         refreshState();
     }
 
@@ -107,6 +140,9 @@ public class CloudSyncPanel extends VBox {
         connectBtn.setDisable(busy);
         disconnectBtn.setDisable(busy);
         syncBtn.setDisable(busy);
+        restoreBtn.setDisable(busy);
+        busySpinner.setVisible(busy);
+        busySpinner.setManaged(busy);
         if (busy && message != null) statusLabel.setText("⏳ " + message);
     }
 
@@ -145,6 +181,76 @@ public class CloudSyncPanel extends VBox {
             accountLabel.setText("👤 Account: " + safeEmail());
             lastSyncLabel.setText("🕓 Last synced: " + formatLastSync());
         }
+
+        // Restore works offline; it's only useful once at least one backup exists.
+        boolean hasBackups = !GoogleDriveSyncManager.listBackups().isEmpty();
+        restoreBtn.setDisable(!hasBackups);
+        restoreBtn.setVisible(hasBackups);
+        restoreBtn.setManaged(hasBackups);
+    }
+
+    /** Lists local pre-overwrite backups and lets the user roll one back over the live database. */
+    private void showRestoreDialog() {
+        List<File> backups = GoogleDriveSyncManager.listBackups();
+        if (backups.isEmpty()) {
+            Alert a = new Alert(Alert.AlertType.INFORMATION, "No backups available yet.");
+            a.setHeaderText("Restore from Backup");
+            a.showAndWait();
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Restore from Backup");
+        TaskDialogs.styleDialog(dialog);
+
+        VBox content = new VBox(8);
+        content.setPadding(new Insets(10));
+        Label info = new Label("Pick a backup to restore. The current database is backed up first, so a restore can itself be undone.");
+        info.setWrapText(true);
+        info.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 12px;");
+        content.getChildren().add(info);
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MMM d, yyyy  h:mm:ss a");
+        for (File backup : backups) {
+            HBox row = new HBox(10);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setStyle("-fx-background-color: #2D2D30; -fx-padding: 8; -fx-background-radius: 4; -fx-border-color: #3E3E42; -fx-border-radius: 4;");
+
+            String when = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(backup.lastModified()), ZoneId.systemDefault()).format(fmt);
+            String sizeKb = String.format("%.0f KB", backup.length() / 1024.0);
+            String dbName = backup.getName().replaceFirst("\\.\\d{8}_\\d{6}\\.bak$", "");
+            Label lbl = new Label(when + "   •   " + sizeKb + "   •   " + dbName);
+            lbl.setStyle("-fx-text-fill: #E0E0E0; -fx-font-size: 12px;");
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Button restore = new Button("Restore");
+            restore.setStyle("-fx-background-color: #1a4d33; -fx-text-fill: #4EC9B0; -fx-border-color: #4EC9B0; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand;");
+            restore.setOnAction(ev -> {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                        "Restore this backup over your current data?\n\n" + when + " (" + dbName + ")",
+                        ButtonType.YES, ButtonType.NO);
+                confirm.setHeaderText("Confirm Restore");
+                TaskDialogs.styleDialog(confirm);
+                confirm.showAndWait().ifPresent(r -> {
+                    if (r == ButtonType.YES) {
+                        dialog.setResult(ButtonType.CLOSE);
+                        dialog.close();
+                        GoogleDriveSyncManager.restoreBackup(backup);
+                    }
+                });
+            });
+
+            row.getChildren().addAll(lbl, spacer, restore);
+            content.getChildren().add(row);
+        }
+
+        ScrollPane scroll = new ScrollPane(content);
+        TaskDialogs.styleScrollPane(scroll, 560, 420);
+        dialog.getDialogPane().setContent(scroll);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
     private String safeEmail() {

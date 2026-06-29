@@ -6,6 +6,7 @@ import com.raeden.ors_to_do.dependencies.models.CalendarTask;
 import com.raeden.ors_to_do.dependencies.models.CustomStat;
 import com.raeden.ors_to_do.dependencies.models.Debuff;
 import com.raeden.ors_to_do.dependencies.models.SectionConfig;
+import com.raeden.ors_to_do.dependencies.models.StylePreset;
 import com.raeden.ors_to_do.dependencies.models.TaskItem;
 import com.raeden.ors_to_do.dependencies.storage.StorageManager;
 import com.raeden.ors_to_do.i18n.Lang;
@@ -62,6 +63,14 @@ public class CalendarPage extends BorderPane {
     private static final String VIEW_PER_ROW = "Per Row";
     private static final String VIEW_PER_COLUMN = "Per Column";
     private static final int COLUMN_VIEW_COLS = 5;
+    /** Fixed height for Per-Column task tiles so they stay uniform and don't shift on window resize. */
+    private static final double COLUMN_TILE_HEIGHT = 120;
+
+    /** The three kinds of day entry; a scenario carries a user-defined tag + colour. */
+    private enum EntryKind { LOG, EVENT, SCENARIO }
+    private static EntryKind kindOf(CalendarEntry e) {
+        return e.isScenario() ? EntryKind.SCENARIO : (e.isEvent() ? EntryKind.EVENT : EntryKind.LOG);
+    }
 
     /** Special filter entry (identity-compared) that shows only favorited days. */
     private static final CalendarTask FAVORITES_SENTINEL = new CalendarTask(Lang.CAL_FILTER_FAVORITES.get());
@@ -318,14 +327,23 @@ public class CalendarPage extends BorderPane {
         customizeItem.setOnAction(e -> openCustomizeDayDialog(date));
         m.getItems().add(customizeItem);
 
+        // Quick reset for a day's custom styling, shown only when the day actually has any.
+        if (config.hasDayIcon(iso) || config.getDayBgColor(iso) != null || config.getDayOutlineColor(iso) != null) {
+            MenuItem resetItem = new MenuItem(Lang.CAL_MENU_RESET_STYLE.get());
+            resetItem.setOnAction(e -> resetDayStyle(iso));
+            m.getItems().add(resetItem);
+        }
+
         if (config.isCalendarJournalOnly()) {
             MenuItem viewDay = new MenuItem(Lang.CAL_MENU_VIEW_ADD_ENTRIES.get());
             viewDay.setOnAction(e -> { selectedDate = date; renderCalendar(); renderTaskList(); });
             MenuItem addJournal = new MenuItem(Lang.CAL_MENU_ADD_JOURNAL.get());
-            addJournal.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, false); });
+            addJournal.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, EntryKind.LOG); });
             MenuItem addEvent = new MenuItem(Lang.CAL_MENU_ADD_EVENT.get());
-            addEvent.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, true); });
-            m.getItems().addAll(viewDay, addJournal, addEvent);
+            addEvent.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, EntryKind.EVENT); });
+            MenuItem addScenario = new MenuItem(Lang.CAL_MENU_ADD_SCENARIO.get());
+            addScenario.setOnAction(e -> { selectedDate = date; showEntryEditDialog(date, null, EntryKind.SCENARIO); });
+            m.getItems().addAll(viewDay, addJournal, addEvent, addScenario);
         } else if (config.isCalendarJournalEnabled()) {
             MenuItem j = new MenuItem(config.hasDayNote(iso) ? Lang.CAL_MENU_EDIT_JOURNAL.get() : Lang.CAL_DLG_ADD_JOURNAL.get());
             j.setOnAction(e -> openJournalEditor(date));
@@ -458,31 +476,38 @@ public class CalendarPage extends BorderPane {
         GridPane g = new GridPane();
         g.setHgap(12); g.setVgap(10); g.setPadding(new Insets(10));
         ColumnConstraints c1 = new ColumnConstraints(); c1.setMinWidth(110);
-        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS); c2.setFillWidth(true);
         g.getColumnConstraints().addAll(c1, c2);
         int row = 0;
 
-        final double CONTROL_W = 160;
         String darkControl = "-fx-background-color: #2D2D30; -fx-border-color: #555555; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand;";
 
         ComboBox<String> iconBox = new ComboBox<>();
         iconBox.getItems().addAll(TaskDialogs.ICON_LIST);
         iconBox.setValue(config.hasDayIcon(iso) ? config.getDayIcon(iso) : "None");
         iconBox.getStylesheets().add(css(COMBO_CSS));
-        iconBox.setPrefWidth(CONTROL_W); iconBox.setStyle(darkControl);
+        iconBox.setStyle(darkControl);
         ColorPicker iconColor = new ColorPicker(Color.web(config.getDayIconColor(iso)));
-        iconColor.setPrefWidth(CONTROL_W); iconColor.setStyle(darkControl);
-        HBox iconRow = new HBox(10, iconBox, iconColor); iconRow.setAlignment(Pos.CENTER_LEFT);
+        iconColor.setStyle(darkControl);
+        HBox iconRow = equalSplit(iconBox, iconColor);
         Label il = new Label(Lang.LBL_ICON_AND_COLOR.get()); il.setStyle("-fx-text-fill: #DDDDDD;");
-        g.add(il, 0, row); g.add(iconRow, 1, row); row++;
 
         // Day cell styling — only in Journal-Only mode (days behave like customizable cards).
         ColorPicker bgPicker = null, outlinePicker = null;
         if (config.isCalendarJournalOnly()) {
             bgPicker = entryColorPicker(config.getDayBgColor(iso));
             outlinePicker = entryColorPicker(config.getDayOutlineColor(iso));
-            bgPicker.setPrefWidth(CONTROL_W); bgPicker.setStyle(darkControl);
-            outlinePicker.setPrefWidth(CONTROL_W); outlinePicker.setStyle(darkControl);
+            fillW(bgPicker).setStyle(darkControl);
+            fillW(outlinePicker).setStyle(darkControl);
+        }
+
+        // Style Preset row sits at the very top (above Icon & Color).
+        Label pl = new Label("Style Preset:"); pl.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(pl, 0, row);
+        g.add(buildStylePresetRow(appStats.getCalendarDayStylePresets(), iconBox, iconColor, bgPicker, outlinePicker), 1, row); row++;
+        g.add(il, 0, row); g.add(iconRow, 1, row); row++;
+
+        if (bgPicker != null) {
             Label bl = new Label(Lang.LBL_BACKGROUND_COLOR.get()); bl.setStyle("-fx-text-fill: #DDDDDD;");
             Label ol = new Label(Lang.LBL_OUTLINE_COLOR.get()); ol.setStyle("-fx-text-fill: #DDDDDD;");
             g.add(bl, 0, row); g.add(bgPicker, 1, row); row++;
@@ -503,8 +528,22 @@ public class CalendarPage extends BorderPane {
             g.add(randomBtn, 1, row); row++;
         }
 
+        // Reset Style clears the day's icon and (journal-only) background/outline back to default.
+        final ColorPicker bgR = bgPicker, olR = outlinePicker;
+        Button resetBtn = new Button(Lang.BTN_RESET_STYLE.get());
+        resetBtn.setMaxWidth(Double.MAX_VALUE);
+        resetBtn.setStyle(darkControl + " -fx-text-fill: #E0E0E0; -fx-font-weight: bold; -fx-padding: 6 12;");
+        resetBtn.setOnAction(e -> {
+            iconBox.setValue("None");
+            iconColor.setValue(Color.web("#FFFFFF"));
+            if (bgR != null) bgR.setValue(Color.TRANSPARENT);
+            if (olR != null) olR.setValue(Color.TRANSPARENT);
+        });
+        g.add(resetBtn, 1, row); row++;
+
         dialog.getDialogPane().setContent(g);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        TaskDialogs.installConfirmCancelShortcuts(dialog);
 
         final ColorPicker bgFinal = bgPicker, outlineFinal = outlinePicker;
         dialog.showAndWait().ifPresent(res -> {
@@ -516,6 +555,14 @@ public class CalendarPage extends BorderPane {
             StorageManager.saveStats(appStats);
             renderCalendar();
         });
+    }
+
+    /** Clears a day's custom icon and (journal-only) background/outline styling back to default. */
+    private void resetDayStyle(String iso) {
+        config.setDayIcon(iso, "None", null);
+        config.setDayStyle(iso, "transparent", "transparent");
+        StorageManager.saveStats(appStats);
+        renderCalendar();
     }
 
     /**
@@ -624,8 +671,9 @@ public class CalendarPage extends BorderPane {
         for (CalendarTask t : config.getCalendarTasks()) cards.add(buildTaskCard(t, columnMode));
 
         if (columnMode) {
-            // Grid layout: multiple cards per row, up to COLUMN_VIEW_COLS columns. Cards are sized
-            // square (prefHeight follows the column width) so they read as tiles, not thin strips.
+            // Grid layout: multiple cards per row, up to COLUMN_VIEW_COLS columns. Tiles use a fixed
+            // height (not bound to their width) so they stay uniform and don't resize/shift as the
+            // window width changes — only their width flexes with the available space.
             GridPane tg = new GridPane();
             tg.setHgap(8);
             tg.setVgap(8);
@@ -639,7 +687,9 @@ public class CalendarPage extends BorderPane {
             for (int i = 0; i < cards.size(); i++) {
                 Region card = cards.get(i);
                 card.setMaxWidth(Double.MAX_VALUE);
-                card.prefHeightProperty().bind(card.widthProperty()); // square tiles
+                card.setMinHeight(COLUMN_TILE_HEIGHT);
+                card.setPrefHeight(COLUMN_TILE_HEIGHT);
+                card.setMaxHeight(COLUMN_TILE_HEIGHT);
                 GridPane.setHgrow(card, Priority.ALWAYS);
                 tg.add(card, i % COLUMN_VIEW_COLS, i / COLUMN_VIEW_COLS);
             }
@@ -666,11 +716,15 @@ public class CalendarPage extends BorderPane {
         // Bright outline on a dark background, matching the app's pill/button styling.
         Button addJournal = new Button(Lang.CAL_BTN_ADD_JOURNAL.get());
         addJournal.setStyle("-fx-background-color: #1A332E; -fx-text-fill: #4EC9B0; -fx-font-weight: bold; -fx-cursor: hand; -fx-border-color: #4EC9B0; -fx-border-radius: 4; -fx-background-radius: 4; -fx-padding: 5 12;");
-        addJournal.setOnAction(e -> showEntryEditDialog(selectedDate, null, false));
+        addJournal.setOnAction(e -> showEntryEditDialog(selectedDate, null, EntryKind.LOG));
         Button addEvent = new Button(Lang.CAL_BTN_ADD_EVENT.get());
         addEvent.setStyle("-fx-background-color: #2A2330; -fx-text-fill: #C586C0; -fx-font-weight: bold; -fx-cursor: hand; -fx-border-color: #C586C0; -fx-border-radius: 4; -fx-background-radius: 4; -fx-padding: 5 12;");
-        addEvent.setOnAction(e -> showEntryEditDialog(selectedDate, null, true));
-        HBox addRow = new HBox(8, addJournal, addEvent);
+        addEvent.setOnAction(e -> showEntryEditDialog(selectedDate, null, EntryKind.EVENT));
+        Button addScenario = new Button(Lang.CAL_BTN_ADD_SCENARIO.get());
+        addScenario.setStyle("-fx-background-color: #1E2A3A; -fx-text-fill: #569CD6; -fx-font-weight: bold; -fx-cursor: hand; -fx-border-color: #569CD6; -fx-border-radius: 4; -fx-background-radius: 4; -fx-padding: 5 12;");
+        addScenario.setOnAction(e -> showEntryEditDialog(selectedDate, null, EntryKind.SCENARIO));
+        HBox addRow = new HBox(8, addJournal, addEvent, addScenario);
+        addRow.setAlignment(Pos.CENTER_LEFT);
         taskListBox.getChildren().add(addRow);
 
         List<CalendarEntry> entries = config.getDayEntries(iso);
@@ -687,7 +741,7 @@ public class CalendarPage extends BorderPane {
     /** Entry card layout: [type tag] [icon] [colored rectangle spanning the card height] [text]. */
     private Region buildEntryCard(LocalDate date, CalendarEntry entry) {
         String iso = date.format(ISO);
-        String accent = entry.isEvent() ? "#C586C0" : "#4EC9B0";
+        String accent = entry.isScenario() ? entry.getTagColor() : (entry.isEvent() ? "#C586C0" : "#4EC9B0");
         String bg = (entry.getBgColor() != null && !entry.getBgColor().equals("transparent")) ? entry.getBgColor() : "#2D2D30";
         String outline = (entry.getOutlineColor() != null && !entry.getOutlineColor().equals("transparent")) ? entry.getOutlineColor() : "#3E3E42";
         String rectColor = (entry.getOutlineColor() != null && !entry.getOutlineColor().equals("transparent")) ? entry.getOutlineColor() : accent;
@@ -696,10 +750,17 @@ public class CalendarPage extends BorderPane {
         card.setFillHeight(true);
         card.setAlignment(Pos.CENTER_LEFT);
         card.setPadding(new Insets(8, 12, 8, 10));
-        card.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-width: 1; -fx-border-color: " + outline + "; -fx-cursor: hand;");
+        String cardStyle = "-fx-background-color: " + bg + "; -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-width: 1; -fx-border-color: " + outline + "; -fx-cursor: hand;";
+        card.setStyle(cardStyle);
 
-        // 1. Entry-type tag (event / log)
-        Label tag = new Label(entry.isEvent() ? Lang.CAL_ENTRY_TAG_EVENT.get() : Lang.CAL_ENTRY_TAG_LOG.get());
+        // 1. Entry-type tag (event / log / custom scenario)
+        String tagText;
+        if (entry.isScenario()) {
+            tagText = entry.getTagLabel().isBlank() ? Lang.CAL_ENTRY_TAG_SCENARIO.get() : entry.getTagLabel();
+        } else {
+            tagText = entry.isEvent() ? Lang.CAL_ENTRY_TAG_EVENT.get() : Lang.CAL_ENTRY_TAG_LOG.get();
+        }
+        Label tag = new Label(tagText);
         tag.setMinWidth(Region.USE_PREF_SIZE);
         tag.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: derive(" + accent + ", -80%); -fx-border-color: " + accent + "; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 1 7;");
 
@@ -716,84 +777,136 @@ public class CalendarPage extends BorderPane {
         rect.setMaxHeight(Double.MAX_VALUE);
         rect.setStyle("-fx-background-color: " + rectColor + "; -fx-background-radius: 3;");
 
-        // 4. Text
-        Label body = new Label(entry.getText());
-        body.setStyle("-fx-text-fill: #E0E0E0; -fx-font-size: 12px;");
-        body.setWrapText(true);
+        // 4. Text — a read-only but selectable box so it can be highlighted and copied with Ctrl+C.
+        TextArea body = com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.selectableArea(entry.getText(), "#E0E0E0", 12, false);
         body.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(body, Priority.ALWAYS);
 
         Button gear = new Button("⚙");
         gear.setStyle("-fx-background-color: transparent; -fx-text-fill: #AAAAAA; -fx-font-size: 14px; -fx-cursor: hand;");
         Tooltip.install(gear, new Tooltip(Lang.CAL_TOOLTIP_CUSTOMIZE_EDIT.get()));
-        gear.setOnAction(e -> showEntryEditDialog(date, entry, entry.isEvent()));
+        gear.setOnAction(e -> showEntryEditDialog(date, entry, kindOf(entry)));
         gear.setOnMouseClicked(javafx.scene.input.MouseEvent::consume);
 
         card.getChildren().addAll(tag, ico, rect, body, gear);
 
-        card.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) showEntryEditDialog(date, entry, entry.isEvent()); });
+        // Double-click opens the editor (a single click now lands in the selectable text box);
+        // the gear button and right-click "Edit" remain one-click.
+        card.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY && e.getClickCount() == 2) showEntryEditDialog(date, entry, kindOf(entry)); });
 
         ContextMenu menu = new ContextMenu();
+        MenuItem copyItem = new MenuItem("Copy Text");
+        copyItem.setOnAction(e -> com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.copyToClipboard(entry.getText()));
         MenuItem editItem = new MenuItem(Lang.CAL_MENU_EDIT_ENTRY.get());
-        editItem.setOnAction(e -> showEntryEditDialog(date, entry, entry.isEvent()));
+        editItem.setOnAction(e -> showEntryEditDialog(date, entry, kindOf(entry)));
         MenuItem delItem = new MenuItem(Lang.CAL_MENU_DELETE_ENTRY.get());
         delItem.setOnAction(e -> {
             config.removeDayEntry(iso, entry.getId());
             StorageManager.saveStats(appStats);
             renderCalendar(); renderTaskList();
         });
-        menu.getItems().addAll(editItem, delItem);
+        // Convert log <-> event in place (keeps text/styling). Scenarios carry their own tag, so
+        // they aren't part of the log/event toggle.
+        if (!entry.isScenario()) {
+            MenuItem convertItem = new MenuItem(entry.isEvent() ? "Convert to Log" : "Convert to Event");
+            convertItem.setOnAction(e -> {
+                entry.setEvent(!entry.isEvent());
+                StorageManager.saveStats(appStats);
+                renderCalendar(); renderTaskList();
+            });
+            menu.getItems().addAll(copyItem, editItem, convertItem, delItem);
+        } else {
+            menu.getItems().addAll(copyItem, editItem, delItem);
+        }
         card.setOnContextMenuRequested(e -> menu.show(card, e.getScreenX(), e.getScreenY()));
+
+        // --- Drag-to-reorder within the day's entry list. ---
+        card.setOnDragDetected(e -> {
+            javafx.scene.input.Dragboard db = card.startDragAndDrop(javafx.scene.input.TransferMode.MOVE);
+            javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+            cc.putString(entry.getId());
+            db.setContent(cc);
+            e.consume();
+        });
+        card.setOnDragOver(e -> {
+            if (e.getGestureSource() != card && e.getDragboard().hasString()) e.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+            e.consume();
+        });
+        card.setOnDragEntered(e -> {
+            if (e.getGestureSource() != card && e.getDragboard().hasString()) card.setStyle(cardStyle + " -fx-border-color: #569CD6; -fx-border-width: 2;");
+        });
+        card.setOnDragExited(e -> card.setStyle(cardStyle));
+        card.setOnDragDropped(e -> {
+            javafx.scene.input.Dragboard db = e.getDragboard();
+            boolean success = false;
+            if (db.hasString()) {
+                config.reorderDayEntry(iso, db.getString(), entry.getId());
+                StorageManager.saveStats(appStats);
+                renderCalendar(); renderTaskList();
+                success = true;
+            }
+            e.setDropCompleted(success);
+            e.consume();
+        });
 
         return card;
     }
 
-    /** Add/edit dialog for a customizable journal entry or event card (Journal-Only mode). */
-    private void showEntryEditDialog(LocalDate date, CalendarEntry existing, boolean isEvent) {
+    /** Add/edit dialog for a customizable journal entry, event, or custom scenario card (Journal-Only mode). */
+    private void showEntryEditDialog(LocalDate date, CalendarEntry existing, EntryKind newKind) {
         String iso = date.format(ISO);
         boolean isNew = existing == null;
-        CalendarEntry entry = isNew ? new CalendarEntry(isEvent, "") : existing;
+        EntryKind kind = isNew ? newKind : kindOf(existing);
+        boolean scenario = kind == EntryKind.SCENARIO;
+        CalendarEntry entry;
+        if (isNew) {
+            entry = new CalendarEntry(kind == EntryKind.EVENT, "");
+            entry.setScenario(scenario);
+        } else {
+            entry = existing;
+        }
 
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle(isEvent ? (isNew ? Lang.CAL_DLG_ADD_EVENT.get() : Lang.CAL_DLG_EDIT_EVENT.get())
-                                : (isNew ? Lang.CAL_DLG_ADD_JOURNAL.get() : Lang.CAL_DLG_EDIT_JOURNAL.get()));
+        String title;
+        if (scenario) title = isNew ? Lang.CAL_DLG_ADD_SCENARIO.get() : Lang.CAL_DLG_EDIT_SCENARIO.get();
+        else if (kind == EntryKind.EVENT) title = isNew ? Lang.CAL_DLG_ADD_EVENT.get() : Lang.CAL_DLG_EDIT_EVENT.get();
+        else title = isNew ? Lang.CAL_DLG_ADD_JOURNAL.get() : Lang.CAL_DLG_EDIT_JOURNAL.get();
+        dialog.setTitle(title);
         TaskDialogs.styleDialog(dialog);
 
         GridPane g = new GridPane();
         g.setHgap(12); g.setVgap(10); g.setPadding(new Insets(10));
         ColumnConstraints c1 = new ColumnConstraints(); c1.setMinWidth(110);
-        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS);
+        ColumnConstraints c2 = new ColumnConstraints(); c2.setHgrow(Priority.ALWAYS); c2.setFillWidth(true);
         g.getColumnConstraints().addAll(c1, c2);
+        int row = 0;
 
-        // Uniform control sizing/styling across the dialog.
-        final double CONTROL_W = 160;
         String darkControl = "-fx-background-color: #2D2D30; -fx-border-color: #555555; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand;";
-
-        TextArea textArea = new TextArea(entry.getText());
-        textArea.setWrapText(true); textArea.setPrefRowCount(6);
-        textArea.setStyle("-fx-control-inner-background: #252526; -fx-text-fill: #E0E0E0; -fx-highlight-fill: #569CD6;");
-        Label tl = new Label("Text:"); tl.setStyle("-fx-text-fill: #DDDDDD;");
-        g.add(tl, 0, 0); g.add(textArea, 1, 0);
-
-        ColorPicker bgPicker = entryColorPicker(entry.getBgColor());
-        ColorPicker outlinePicker = entryColorPicker(entry.getOutlineColor());
-        bgPicker.setPrefWidth(CONTROL_W); bgPicker.setStyle(darkControl);
-        outlinePicker.setPrefWidth(CONTROL_W); outlinePicker.setStyle(darkControl);
-        Label bl = new Label(Lang.LBL_BACKGROUND_COLOR.get()); bl.setStyle("-fx-text-fill: #DDDDDD;");
-        Label ol = new Label(Lang.LBL_OUTLINE_COLOR.get()); ol.setStyle("-fx-text-fill: #DDDDDD;");
-        g.add(bl, 0, 1); g.add(bgPicker, 1, 1);
-        g.add(ol, 0, 2); g.add(outlinePicker, 1, 2);
 
         ComboBox<String> iconBox = new ComboBox<>();
         iconBox.getItems().addAll(TaskDialogs.ICON_LIST);
         iconBox.setValue(entry.getIconSymbol());
         iconBox.getStylesheets().add(css(COMBO_CSS));
-        iconBox.setPrefWidth(CONTROL_W); iconBox.setStyle(darkControl);
+        iconBox.setStyle(darkControl);
         ColorPicker iconColor = new ColorPicker(Color.web(entry.getIconColor()));
-        iconColor.setPrefWidth(CONTROL_W); iconColor.setStyle(darkControl);
-        HBox iconRow = new HBox(10, iconBox, iconColor); iconRow.setAlignment(Pos.CENTER_LEFT);
-        Label il = new Label(Lang.LBL_ICON_AND_COLOR.get()); il.setStyle("-fx-text-fill: #DDDDDD;");
-        g.add(il, 0, 3); g.add(iconRow, 1, 3);
+        iconColor.setStyle(darkControl);
+
+        ColorPicker bgPicker = entryColorPicker(entry.getBgColor());
+        ColorPicker outlinePicker = entryColorPicker(entry.getOutlineColor());
+        fillW(bgPicker).setStyle(darkControl);
+        fillW(outlinePicker).setStyle(darkControl);
+
+        // Scenario-only: a user-defined tag name and tag colour (the accent shown on the card).
+        TextField tagField = null;
+        ColorPicker tagColorPicker = null;
+        if (scenario) {
+            tagField = new TextField(entry.getTagLabel());
+            tagField.setPromptText(Lang.CAL_PROMPT_SCENARIO_TAG.get());
+            fillW(tagField);
+            tagColorPicker = new ColorPicker(Color.web(entry.getTagColor()));
+            fillW(tagColorPicker).setStyle(darkControl);
+        }
+        final ColorPicker tagColorF = tagColorPicker;
 
         Button randomBtn = new Button(Lang.BTN_RANDOMIZE_STYLE.get());
         randomBtn.setMaxWidth(Double.MAX_VALUE);
@@ -805,16 +918,46 @@ public class CalendarPage extends BorderPane {
             outlinePicker.setValue(Color.hsb(hue, 0.8, 0.8));
             iconBox.setValue(TaskDialogs.ICON_LIST[rand.nextInt(TaskDialogs.ICON_LIST.length - 1) + 1]);
             iconColor.setValue(Color.hsb(hue, 0.5, 0.95));
+            if (tagColorF != null) tagColorF.setValue(Color.hsb(hue, 0.8, 0.85));
         });
-        g.add(randomBtn, 1, 4);
+
+        // Style Preset row sits at the very top, then text, (scenario tag), colours, icon, randomize.
+        Label pl = new Label("Style Preset:"); pl.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(pl, 0, row);
+        g.add(buildStylePresetRow(appStats.getCalendarEntryStylePresets(), iconBox, iconColor, bgPicker, outlinePicker), 1, row); row++;
+
+        TextArea textArea = new TextArea(entry.getText());
+        textArea.setWrapText(true); textArea.setPrefRowCount(6);
+        textArea.setMaxWidth(Double.MAX_VALUE);
+        textArea.setStyle("-fx-control-inner-background: #252526; -fx-text-fill: #E0E0E0; -fx-highlight-fill: #569CD6;");
+        Label tl = new Label("Text:"); tl.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(tl, 0, row); g.add(textArea, 1, row); row++;
+
+        if (scenario) {
+            Label tagL = new Label(Lang.CAL_LBL_SCENARIO_TAG.get()); tagL.setStyle("-fx-text-fill: #DDDDDD;");
+            Label tcL = new Label(Lang.CAL_LBL_TAG_COLOR.get()); tcL.setStyle("-fx-text-fill: #DDDDDD;");
+            g.add(tagL, 0, row); g.add(tagField, 1, row); row++;
+            g.add(tcL, 0, row); g.add(tagColorPicker, 1, row); row++;
+        }
+
+        Label bl = new Label(Lang.LBL_BACKGROUND_COLOR.get()); bl.setStyle("-fx-text-fill: #DDDDDD;");
+        Label ol = new Label(Lang.LBL_OUTLINE_COLOR.get()); ol.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(bl, 0, row); g.add(bgPicker, 1, row); row++;
+        g.add(ol, 0, row); g.add(outlinePicker, 1, row); row++;
+
+        HBox iconRow = equalSplit(iconBox, iconColor);
+        Label il = new Label(Lang.LBL_ICON_AND_COLOR.get()); il.setStyle("-fx-text-fill: #DDDDDD;");
+        g.add(il, 0, row); g.add(iconRow, 1, row); row++;
+
+        g.add(randomBtn, 1, row); row++;
 
         ScrollPane sp = new ScrollPane(g);
-        sp.setFitToWidth(true); sp.setPrefSize(480, 380);
-        sp.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
-        sp.setBorder(Border.EMPTY);
+        TaskDialogs.styleScrollPane(sp, 480, 380);
         dialog.getDialogPane().setContent(sp);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        TaskDialogs.installConfirmCancelShortcuts(dialog);
 
+        final TextField tagFieldF = tagField;
         dialog.showAndWait().ifPresent(res -> {
             if (res != ButtonType.OK) return;
             entry.setText(textArea.getText() == null ? "" : textArea.getText());
@@ -822,6 +965,10 @@ public class CalendarPage extends BorderPane {
             entry.setOutlineColor(ColorUtil.toHexOrTransparent(outlinePicker.getValue()));
             entry.setIconSymbol(iconBox.getValue());
             entry.setIconColor(ColorUtil.toHex(iconColor.getValue()));
+            if (scenario) {
+                entry.setTagLabel(tagFieldF.getText() == null ? "" : tagFieldF.getText().trim());
+                entry.setTagColor(ColorUtil.toHex(tagColorF.getValue()));
+            }
             if (isNew) config.addDayEntry(iso, entry);
             StorageManager.saveStats(appStats);
             renderCalendar(); renderTaskList();
@@ -832,6 +979,102 @@ public class CalendarPage extends BorderPane {
         ColorPicker cp = new ColorPicker();
         cp.setValue(hex != null && !hex.equals("transparent") ? Color.web(hex) : Color.TRANSPARENT);
         return cp;
+    }
+
+    private static Color webOrTransparent(String hex) {
+        return (hex == null || hex.equals("transparent")) ? Color.TRANSPARENT : Color.web(hex);
+    }
+
+    /**
+     * Builds a "Style Preset" row (load dropdown + Save button) wired to the supplied style controls.
+     * {@code bgPicker}/{@code outlinePicker} may be null (e.g. Customize Day outside Journal-Only),
+     * in which case only the icon is part of the preset. Presets persist on {@link AppStats}.
+     */
+    private HBox buildStylePresetRow(List<StylePreset> presets, ComboBox<String> iconBox, ColorPicker iconColor,
+                                     ColorPicker bgPicker, ColorPicker outlinePicker) {
+        String darkControl = "-fx-background-color: #2D2D30; -fx-border-color: #555555; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand;";
+
+        ComboBox<StylePreset> presetBox = new ComboBox<>();
+        presetBox.setPromptText("Load preset…");
+        presetBox.getItems().addAll(presets);
+        fillW(presetBox);
+        HBox.setHgrow(presetBox, Priority.ALWAYS);
+        presetBox.setStyle(darkControl);
+        presetBox.getStylesheets().add(css(COMBO_CSS));
+        presetBox.setOnAction(e -> {
+            StylePreset p = presetBox.getValue();
+            if (p == null) return;
+            if (p.getIconSymbol() != null) iconBox.setValue(p.getIconSymbol());
+            if (p.getIconColor() != null) iconColor.setValue(Color.web(p.getIconColor()));
+            if (bgPicker != null && p.getBgColor() != null) bgPicker.setValue(webOrTransparent(p.getBgColor()));
+            if (outlinePicker != null && p.getOutlineColor() != null) outlinePicker.setValue(webOrTransparent(p.getOutlineColor()));
+        });
+
+        // Copies the current style controls into a preset (used by both Save-new and Edit-update).
+        java.util.function.Consumer<StylePreset> captureStyle = p -> {
+            p.setIconSymbol(iconBox.getValue());
+            p.setIconColor(ColorUtil.toHex(iconColor.getValue()));
+            if (bgPicker != null) p.setBgColor(ColorUtil.toHexOrTransparent(bgPicker.getValue()));
+            if (outlinePicker != null) p.setOutlineColor(ColorUtil.toHexOrTransparent(outlinePicker.getValue()));
+        };
+
+        Button saveBtn = new Button("💾 Save");
+        saveBtn.setStyle(darkControl + " -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 4 12;");
+        Tooltip.install(saveBtn, new Tooltip("Save the current style as a new preset"));
+        saveBtn.setOnAction(e -> {
+            TextInputDialog nameDialog = new TextInputDialog("Style Preset");
+            nameDialog.setTitle("Save Style Preset");
+            nameDialog.setHeaderText("Name this style preset:");
+            TaskDialogs.styleDialog(nameDialog);
+            nameDialog.showAndWait().ifPresent(nm -> {
+                String name = nm == null ? "" : nm.trim();
+                if (name.isEmpty()) return;
+                StylePreset p = new StylePreset(name);
+                captureStyle.accept(p);
+                presets.add(p);
+                presetBox.getItems().add(p);
+                presetBox.setValue(p);
+                StorageManager.saveStats(appStats);
+            });
+        });
+
+        Button editBtn = new Button("✎");
+        editBtn.setStyle(darkControl + " -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 4 10;");
+        Tooltip.install(editBtn, new Tooltip("Rename the selected preset and update it to the current style"));
+        editBtn.setOnAction(e -> {
+            StylePreset p = presetBox.getValue();
+            if (p == null) return;
+            TextInputDialog d = new TextInputDialog(p.getName());
+            d.setTitle("Edit Style Preset");
+            d.setHeaderText("Rename this preset (its style is updated to the current selection):");
+            TaskDialogs.styleDialog(d);
+            d.showAndWait().ifPresent(nm -> {
+                String name = nm == null ? "" : nm.trim();
+                if (!name.isEmpty()) p.setName(name);
+                captureStyle.accept(p);
+                StorageManager.saveStats(appStats);
+                // Rebuild the dropdown so the renamed label shows; keep the same selection.
+                presetBox.getItems().setAll(presets);
+                presetBox.setValue(p);
+            });
+        });
+
+        Button delBtn = new Button("🗑");
+        delBtn.setStyle(darkControl + " -fx-text-fill: #E06C75; -fx-font-weight: bold; -fx-padding: 4 10;");
+        Tooltip.install(delBtn, new Tooltip("Delete the selected preset"));
+        delBtn.setOnAction(e -> {
+            StylePreset p = presetBox.getValue();
+            if (p == null) return;
+            presets.remove(p);
+            presetBox.getItems().remove(p);
+            presetBox.setValue(null);
+            StorageManager.saveStats(appStats);
+        });
+
+        HBox row = new HBox(8, presetBox, saveBtn, editBtn, delBtn);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setMaxWidth(Double.MAX_VALUE);
+        return row;
     }
 
     private Region buildAddCard(boolean columnMode) {
@@ -1195,6 +1438,24 @@ public class CalendarPage extends BorderPane {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** Lets a control stretch to fill its grid column (so all dialog controls line up to the edge). */
+    private static <T extends Region> T fillW(T r) {
+        r.setMaxWidth(Double.MAX_VALUE);
+        return r;
+    }
+
+    /** Two controls sharing a row, each growing to fill half the width (e.g. icon + icon colour). */
+    private static HBox equalSplit(Region a, Region b) {
+        a.setMaxWidth(Double.MAX_VALUE);
+        b.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(a, Priority.ALWAYS);
+        HBox.setHgrow(b, Priority.ALWAYS);
+        HBox box = new HBox(10, a, b);
+        box.setAlignment(Pos.CENTER_LEFT);
+        box.setMaxWidth(Double.MAX_VALUE);
+        return box;
+    }
 
     private void addRow(GridPane g, int[] r, String label, javafx.scene.Node control) {
         Label l = new Label(label);

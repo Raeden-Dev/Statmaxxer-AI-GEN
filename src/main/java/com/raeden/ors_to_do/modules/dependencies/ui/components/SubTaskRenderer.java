@@ -57,6 +57,7 @@ public class SubTaskRenderer extends VBox {
 
                 Hyperlink hyper = new Hyperlink(displayName);
                 hyper.setStyle("-fx-text-fill: #569CD6; -fx-font-size: " + Math.max(10, appStats.getTaskFontSize() - 2) + "px;");
+                com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.makeCopyable(hyper);
                 hyper.setOnAction(e -> {
                     try { java.awt.Desktop.getDesktop().browse(new java.net.URI(linkObj.getUrl())); }
                     catch (Exception ex) {
@@ -102,6 +103,7 @@ public class SubTaskRenderer extends VBox {
                 int subSize = Math.max(10, appStats.getTaskFontSize() - 2);
                 String strike = sub.isFinished() ? "-fx-strikethrough: true; " : "";
                 subText.setStyle("-fx-font-size: " + subSize + "px; " + strike + "-fx-text-fill: #858585;");
+                com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.makeCopyable(subText);
 
                 HBox subTextContainer = new HBox(subText);
                 subTextContainer.setAlignment(Pos.CENTER_LEFT);

@@ -29,6 +29,7 @@ public class TaskMetaForm {
         selectedDeps = new ArrayList<>(task.getDependsOnTaskIds());
 
         MenuButton dependenciesMenu = buildDependenciesMenu(task, appStats, db);
+        TaskDialogs.addMenuSearch(dependenciesMenu, "Search tasks…");
 
         grid.add(new Label((config != null && config.isRewardsPage()) ? "Unlock Condition:" : "Depends On:"), 0, rowIdx.get());
         grid.add(dependenciesMenu, 1, rowIdx.getAndIncrement());
@@ -46,7 +47,9 @@ public class TaskMetaForm {
         if (config == null || config.isShowTaskType()) {
             taskTypeField = new TextField(task.getTaskType() != null ? task.getTaskType() : "");
             taskTypeField.setMaxWidth(Double.MAX_VALUE);
-            grid.add(new Label("Category:"), 0, rowIdx.get());
+            // Labelled "Work Type" (matching the section's "Enable Work Types" toggle) so it isn't
+            // confused with the separate Categories feature, which has its own field below.
+            grid.add(new Label("Work Type:"), 0, rowIdx.get());
             grid.add(taskTypeField, 1, rowIdx.getAndIncrement());
         }
 
@@ -54,6 +57,7 @@ public class TaskMetaForm {
             targetTimeField = new TextField();
             targetTimeField.setMaxWidth(Double.MAX_VALUE);
             targetTimeField.setPromptText("Minutes (0 = Off)");
+            TaskDialogs.makeIntegerField(targetTimeField, false);
             if (task.getTargetTimeMinutes() > 0) targetTimeField.setText(String.valueOf(task.getTargetTimeMinutes()));
 
             grid.add(new Label("Required Focus Time (m):"), 0, rowIdx.get());

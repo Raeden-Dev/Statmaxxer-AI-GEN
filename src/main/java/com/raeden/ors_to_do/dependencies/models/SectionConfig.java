@@ -265,6 +265,22 @@ public class SectionConfig implements Serializable {
         if (list.isEmpty()) getCalendarEntries().remove(isoDate);
     }
 
+    /** Reorders a day's entries by moving the dragged entry to the dropped-on entry's position. */
+    public void reorderDayEntry(String isoDate, String draggedId, String targetId) {
+        if (draggedId == null || draggedId.equals(targetId)) return;
+        List<CalendarEntry> list = getCalendarEntries().get(isoDate);
+        if (list == null) return;
+        int from = -1, to = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getId().equals(draggedId)) from = i;
+            if (list.get(i).getId().equals(targetId)) to = i;
+        }
+        if (from < 0 || to < 0) return;
+        CalendarEntry moved = list.remove(from);
+        if (from < to) to--;
+        list.add(to, moved);
+    }
+
     /** True if the day has any non-event journal entry. */
     public boolean hasDayNote(String isoDate) {
         for (CalendarEntry e : getDayEntries(isoDate)) if (!e.isEvent()) return true;

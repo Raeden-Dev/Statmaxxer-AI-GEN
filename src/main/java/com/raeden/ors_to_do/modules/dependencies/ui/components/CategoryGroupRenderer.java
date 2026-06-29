@@ -13,6 +13,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
@@ -247,7 +248,49 @@ public final class CategoryGroupRenderer {
             if (onStyleChanged != null) onStyleChanged.run();
         });
 
-        ctx.getItems().addAll(customizeItem, syncStyleItem);
+        // "Move all cards to…" — bulk-moves every card in this category into another category.
+        Menu moveAllMenu = new Menu("Move all cards to…");
+        java.util.LinkedHashSet<String> targets = new java.util.LinkedHashSet<>();
+        for (CategoryStyle cs : config.getCategoryStyles()) {
+            if (cs.getName() != null && !cs.getName().trim().isEmpty()) targets.add(cs.getName().trim());
+        }
+        for (TaskItem t : globalDatabase) {
+            if (!config.getId().equals(t.getSectionId())) continue;
+            String c = t.getCategoryName();
+            if (c != null && !c.trim().isEmpty()) targets.add(c.trim());
+        }
+        targets.remove(name); // can't move to itself
+        java.util.List<String> sortedTargets = new java.util.ArrayList<>(targets);
+        sortedTargets.sort(String.CASE_INSENSITIVE_ORDER);
+
+        java.util.function.BiConsumer<String, String> moveAll = (targetName, targetDisplay) -> {
+            for (TaskItem t : globalDatabase) {
+                if (!config.getId().equals(t.getSectionId())) continue;
+                String c = t.getCategoryName();
+                boolean inThis = isUncategorized ? (c == null || c.trim().isEmpty()) : (c != null && c.trim().equals(name));
+                if (inThis) {
+                    t.setCategoryName(targetName);
+                    com.raeden.ors_to_do.modules.dependencies.ui.menus.TaskContextMenu.applyCategoryAutoStyle(t, config);
+                }
+            }
+            StorageManager.saveTasks(globalDatabase);
+            if (onStyleChanged != null) onStyleChanged.run();
+        };
+
+        for (String target : sortedTargets) {
+            MenuItem mi = new MenuItem(target);
+            mi.setOnAction(e -> moveAll.accept(target, target));
+            moveAllMenu.getItems().add(mi);
+        }
+        if (!isUncategorized) {
+            if (!sortedTargets.isEmpty()) moveAllMenu.getItems().add(new javafx.scene.control.SeparatorMenuItem());
+            MenuItem unc = new MenuItem("Uncategorized");
+            unc.setOnAction(e -> moveAll.accept(null, "Uncategorized"));
+            moveAllMenu.getItems().add(unc);
+        }
+        moveAllMenu.setDisable(moveAllMenu.getItems().isEmpty());
+
+        ctx.getItems().addAll(customizeItem, syncStyleItem, moveAllMenu);
         row.setOnContextMenuRequested(e -> {
             ctx.show(row, e.getScreenX(), e.getScreenY());
             e.consume();

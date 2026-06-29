@@ -207,9 +207,9 @@ public class ChallengeCard extends VBox {
 
         // --- DESCRIPTION (Always visible) ---
         VBox descBox = new VBox(5);
-        Label descLabel = new Label(challengeTask.getPerkDescription() == null || challengeTask.getPerkDescription().isEmpty() ? Lang.NO_DESCRIPTION.get() : challengeTask.getPerkDescription());
-        descLabel.setStyle("-fx-text-fill: #CCCCCC; -fx-font-size: 13px; -fx-font-style: italic;");
-        descLabel.setWrapText(true);
+        String challengeDesc = challengeTask.getPerkDescription() == null || challengeTask.getPerkDescription().isEmpty() ? Lang.NO_DESCRIPTION.get() : challengeTask.getPerkDescription();
+        javafx.scene.control.TextArea descLabel = com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.selectableArea(challengeDesc, "#CCCCCC", 13, true);
+        descLabel.setMaxWidth(Double.MAX_VALUE);
         descBox.getChildren().add(descLabel);
 
         // --- LOOT BOX ---

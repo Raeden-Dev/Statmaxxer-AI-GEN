@@ -267,13 +267,11 @@ public class StatsManagerPanel extends VBox {
         }
 
         ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefSize(580, 480);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
-        scrollPane.setBorder(Border.EMPTY);
+        TaskDialogs.styleScrollPane(scrollPane, 580, 480);
 
         dialog.getDialogPane().setContent(scrollPane);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        TaskDialogs.installConfirmCancelShortcuts(dialog);
 
         dialog.showAndWait().ifPresent(res -> {
             if (res == ButtonType.OK) {
@@ -500,18 +498,11 @@ public class StatsManagerPanel extends VBox {
         mainContent.getChildren().addAll(thresholdsList, addThreshBox);
 
         ScrollPane scrollPane = new ScrollPane(mainContent);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefSize(580, 600);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
-        scrollPane.setBorder(Border.EMPTY);
-
-        String scrollCss = ".scroll-bar:vertical, .scroll-bar:horizontal { -fx-background-color: transparent; } " +
-                ".scroll-bar:vertical .track, .scroll-bar:horizontal .track { -fx-background-color: #1E1E1E; -fx-border-color: transparent; } " +
-                ".scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb { -fx-background-color: #555555; -fx-background-radius: 5; }";
-        scrollPane.getStylesheets().add("data:text/css;base64," + java.util.Base64.getEncoder().encodeToString(scrollCss.getBytes()));
+        TaskDialogs.styleScrollPane(scrollPane, 580, 600);
 
         dialog.getDialogPane().setContent(scrollPane);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        TaskDialogs.installConfirmCancelShortcuts(dialog);
 
         dialog.showAndWait().ifPresent(res -> {
             if (res == ButtonType.OK && !nameField.getText().trim().isEmpty()) {

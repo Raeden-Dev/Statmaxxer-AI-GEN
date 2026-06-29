@@ -11,6 +11,8 @@ import javafx.scene.paint.Color;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs;
+
 import static com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs.ICON_LIST;
 
 public class TaskStyleForm {
@@ -49,7 +51,7 @@ public class TaskStyleForm {
             HBox.setHgrow(iconBox, Priority.ALWAYS);
             iconBox.getItems().addAll(ICON_LIST);
             iconBox.setValue(task.getIconSymbol() != null ? task.getIconSymbol() : "None");
-            iconColorPicker = new ColorPicker(Color.web(task.getIconColor() != null ? task.getIconColor() : "#FFFFFF"));
+            iconColorPicker = TaskDialogs.trailingColorPicker(new ColorPicker(Color.web(task.getIconColor() != null ? task.getIconColor() : "#FFFFFF")));
 
             grid.add(new Label("Icon & Color:"), 0, rowIdx.get());
             grid.add(new HBox(10, iconBox, iconColorPicker), 1, rowIdx.getAndIncrement());
@@ -59,7 +61,7 @@ public class TaskStyleForm {
             prefixFieldEdit = new TextField(task.getPrefix() != null ? task.getPrefix() : "");
             prefixFieldEdit.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(prefixFieldEdit, Priority.ALWAYS);
-            preC = new ColorPicker(Color.web(task.getPrefixColor() != null ? task.getPrefixColor() : "#4EC9B0"));
+            preC = TaskDialogs.trailingColorPicker(new ColorPicker(Color.web(task.getPrefixColor() != null ? task.getPrefixColor() : "#4EC9B0")));
 
             grid.add(new Label("Prefix & Color:"), 0, rowIdx.get());
             grid.add(new HBox(10, prefixFieldEdit, preC), 1, rowIdx.getAndIncrement());
@@ -68,7 +70,7 @@ public class TaskStyleForm {
         Button randomBtn = new Button("🎲 Randomize Style");
         randomBtn.setMaxWidth(Double.MAX_VALUE);
         randomBtn.setOnAction(e -> applyRandomStyle());
-        grid.add(randomBtn, 1, rowIdx.getAndIncrement());
+        grid.add(randomBtn, 0, rowIdx.get(), 2, 1); rowIdx.getAndIncrement();
         grid.add(new Separator(), 0, rowIdx.get(), 2, 1); rowIdx.getAndIncrement();
     }
 

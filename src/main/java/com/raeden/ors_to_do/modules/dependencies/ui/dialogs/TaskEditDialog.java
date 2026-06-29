@@ -46,7 +46,9 @@ public class TaskEditDialog {
         contentField.setWrapText(true);
         contentField.setPrefRowCount(config != null && config.isNotesPage() ? 6 : 2);
 
-        grid.add(new Label(config != null && config.isNotesPage() ? "Note Text:" : (config != null && config.isRewardsPage() ? "Reward Name:" : "Content:")), 0, rowIdx.get());
+        Label contentLabel = new Label(config != null && config.isNotesPage() ? "Note Text:" : (config != null && config.isRewardsPage() ? "Reward Name:" : "Content:"));
+        GridPane.setValignment(contentLabel, javafx.geometry.VPos.TOP);
+        grid.add(contentLabel, 0, rowIdx.get());
         grid.add(contentField, 1, rowIdx.getAndIncrement());
 
         CheckBox linkCardCheck = new CheckBox("Is Link Card?");
@@ -119,6 +121,7 @@ public class TaskEditDialog {
         descContentField.setDisable(!descCardCheck.isSelected());
 
         if (sectionAllowsDescription) {
+            GridPane.setValignment(descCardCheck, javafx.geometry.VPos.TOP);
             grid.add(descCardCheck, 0, rowIdx.get());
             grid.add(descContentField, 1, rowIdx.getAndIncrement());
             // If the task is already a description card, the mutually-exclusive modes start locked.
@@ -137,6 +140,7 @@ public class TaskEditDialog {
             Label noteHint = new Label("Behaves like a note: a pin replaces the checkbox and it never counts as completed.");
             noteHint.setWrapText(true);
             noteHint.setStyle("-fx-text-fill: #858585; -fx-font-size: 11px;");
+            GridPane.setValignment(noteCardCheck, javafx.geometry.VPos.TOP);
             grid.add(noteCardCheck, 0, rowIdx.get());
             grid.add(noteHint, 1, rowIdx.getAndIncrement());
             // A note card starts with the mutually-exclusive modes locked off.
@@ -248,23 +252,11 @@ public class TaskEditDialog {
         }
 
         ScrollPane scrollPane = new ScrollPane(grid);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefSize(600, 550);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
-        scrollPane.setBorder(Border.EMPTY);
-
-        // --- FIXED: Removed invalid '.label' CSS rule entirely to stop the crashing ---
-        String scrollCss =
-                ".scroll-bar:vertical, .scroll-bar:horizontal { -fx-background-color: transparent; } " +
-                        ".scroll-bar:vertical .track, .scroll-bar:horizontal .track { -fx-background-color: #1E1E1E; -fx-border-color: transparent; } " +
-                        ".scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb { -fx-background-color: #555555; -fx-background-radius: 5; } " +
-                        ".scroll-bar:vertical .thumb:hover, .scroll-bar:horizontal .thumb:hover { -fx-background-color: #888888; } " +
-                        ".scroll-bar > .increment-button, .scroll-bar > .decrement-button { -fx-padding: 0; }";
-
-        scrollPane.getStylesheets().add("data:text/css;base64," + java.util.Base64.getEncoder().encodeToString(scrollCss.getBytes()));
+        TaskDialogs.styleScrollPane(scrollPane, 600, 550);
 
         dialog.getDialogPane().setContent(scrollPane);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        TaskDialogs.installConfirmCancelShortcuts(dialog);
 
         // 4. Handle Save Execution
         dialog.showAndWait().ifPresent(response -> {

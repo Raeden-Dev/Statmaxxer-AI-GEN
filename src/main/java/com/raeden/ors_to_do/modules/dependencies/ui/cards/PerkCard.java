@@ -147,9 +147,9 @@ public class PerkCard extends VBox {
         VBox descBox = new VBox(5);
         descBox.setVisible(false);
         descBox.setManaged(false);
-        Label descLabel = new Label(perkTask.getPerkDescription() == null || perkTask.getPerkDescription().isEmpty() ? Lang.NO_DESCRIPTION.get() : perkTask.getPerkDescription());
-        descLabel.setStyle("-fx-text-fill: #CCCCCC; -fx-font-size: 13px; -fx-font-style: italic;");
-        descLabel.setWrapText(true);
+        String perkDesc = perkTask.getPerkDescription() == null || perkTask.getPerkDescription().isEmpty() ? Lang.NO_DESCRIPTION.get() : perkTask.getPerkDescription();
+        javafx.scene.control.TextArea descLabel = com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.selectableArea(perkDesc, "#CCCCCC", 13, true);
+        descLabel.setMaxWidth(Double.MAX_VALUE);
         descBox.getChildren().add(descLabel);
 
         Button toggleDescBtn = new Button(Lang.TOGGLE_SHOW_DETAILS.get());

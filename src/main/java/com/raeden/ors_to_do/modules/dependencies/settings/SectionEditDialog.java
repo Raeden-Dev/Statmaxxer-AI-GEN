@@ -381,18 +381,11 @@ public class SectionEditDialog {
         updateUIState.run();
 
         ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefSize(720, 600);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: #1E1E1E;");
-        scrollPane.setBorder(Border.EMPTY);
-
-        String scrollCss = ".scroll-bar:vertical, .scroll-bar:horizontal { -fx-background-color: transparent; } " +
-                ".scroll-bar:vertical .track, .scroll-bar:horizontal .track { -fx-background-color: #1E1E1E; -fx-border-color: transparent; } " +
-                ".scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb { -fx-background-color: #555555; -fx-background-radius: 5; }";
-        scrollPane.getStylesheets().add("data:text/css;base64," + java.util.Base64.getEncoder().encodeToString(scrollCss.getBytes()));
+        com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs.styleScrollPane(scrollPane, 720, 600);
 
         dialog.getDialogPane().setContent(scrollPane);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        com.raeden.ors_to_do.modules.dependencies.ui.dialogs.TaskDialogs.installConfirmCancelShortcuts(dialog);
 
         dialog.showAndWait().ifPresent(res -> {
             if (res == ButtonType.OK) {

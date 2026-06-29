@@ -80,6 +80,10 @@ public class AppStats implements Serializable {
     private List<SectionConfig> sectionPresets = new ArrayList<>();
     private List<String> requireConfirmationSections = new ArrayList<>();
 
+    // Reusable saved styling for Calendar pages: "Customize Day" looks and journal entry/event looks.
+    private List<StylePreset> calendarDayStylePresets = new ArrayList<>();
+    private List<StylePreset> calendarEntryStylePresets = new ArrayList<>();
+
     private List<CustomPriority> customPriorities = new ArrayList<>(List.of(
             new CustomPriority("LOW", "#4EC9B0"),
             new CustomPriority("MED", "#FF8C00"),
@@ -239,6 +243,15 @@ public class AppStats implements Serializable {
         return sectionPresets;
     }
     public void setSectionPresets(List<SectionConfig> sectionPresets) { this.sectionPresets = sectionPresets; }
+
+    public List<StylePreset> getCalendarDayStylePresets() {
+        if (calendarDayStylePresets == null) calendarDayStylePresets = new ArrayList<>();
+        return calendarDayStylePresets;
+    }
+    public List<StylePreset> getCalendarEntryStylePresets() {
+        if (calendarEntryStylePresets == null) calendarEntryStylePresets = new ArrayList<>();
+        return calendarEntryStylePresets;
+    }
 
     public List<String> getRequireConfirmationSections() {
         if (requireConfirmationSections == null) requireConfirmationSections = new ArrayList<>();
@@ -512,6 +525,8 @@ public class AppStats implements Serializable {
 
         this.sections = new ArrayList<>(other.sections);
         this.sectionPresets = new ArrayList<>(other.sectionPresets);
+        this.calendarDayStylePresets = new ArrayList<>(other.getCalendarDayStylePresets());
+        this.calendarEntryStylePresets = new ArrayList<>(other.getCalendarEntryStylePresets());
         this.requireConfirmationSections = new ArrayList<>(other.requireConfirmationSections);
         this.customPriorities = new ArrayList<>(other.customPriorities);
         this.baseDailies = new ArrayList<>(other.baseDailies);

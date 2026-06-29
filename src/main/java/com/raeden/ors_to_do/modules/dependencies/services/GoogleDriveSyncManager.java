@@ -410,6 +410,53 @@ public final class GoogleDriveSyncManager {
         initialSyncComplete = true;
     }
 
+    // ------------------------------------------------------------------
+    // Local backups — list + restore (works offline; no Drive needed)
+    // ------------------------------------------------------------------
+
+    /** All local pre-overwrite backups, newest first. Empty when none have been made yet. */
+    public static java.util.List<java.io.File> listBackups() {
+        java.io.File dir = new java.io.File(appDir(), BACKUP_DIR);
+        java.io.File[] files = dir.listFiles((d, n) -> n.endsWith(".bak"));
+        java.util.List<java.io.File> list = new java.util.ArrayList<>();
+        if (files != null) {
+            list.addAll(java.util.Arrays.asList(files));
+            list.sort(java.util.Comparator.comparingLong(java.io.File::lastModified).reversed());
+        }
+        return list;
+    }
+
+    /**
+     * Restores a local backup over its corresponding database file and reloads the app. Backs the
+     * current live database up first (so a restore is itself reversible). Works without a Drive
+     * connection.
+     */
+    public static void restoreBackup(java.io.File backup) {
+        if (backup == null || !backup.exists()) return;
+        EXECUTOR.submit(() -> {
+            try {
+                String dbName = backup.getName().replaceFirst("\\.\\d{8}_\\d{6}\\.bak$", "");
+                java.io.File local = new java.io.File(appDir(), dbName);
+                if (local.exists() && local.length() > 0) backupLocal(local);
+
+                java.io.File tmp = new java.io.File(appDir(), dbName + ".incoming");
+                Files.copy(backup.toPath(), tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+                // A restore changes local content, so its marker baseline is no longer valid; clear it
+                // so the next sync re-evaluates (and pushes the restored data up).
+                clearMarker(dbName);
+
+                java.util.List<PendingDownload> one = Collections.singletonList(
+                        new PendingDownload(local, tmp, System.currentTimeMillis()));
+                Consumer<List<PendingDownload>> handler = reloadHandler;
+                if (handler != null) handler.accept(one);
+                else applyDownloadsDirect(one);
+            } catch (Exception e) {
+                System.err.println("[GoogleDriveSync] restore failed: " + e.getMessage());
+            }
+        });
+    }
+
     /** Backs up the current local file (if any) and downloads the remote into a temp file. */
     private static PendingDownload prepareDownload(Drive drive, File remote, java.io.File local) throws Exception {
         if (local.exists() && local.length() > 0) backupLocal(local);
@@ -507,6 +554,16 @@ public final class GoogleDriveSyncManager {
         Properties p = loadState();
         if (md5 != null && !md5.isBlank()) p.setProperty(name + ".md5", md5);
         p.setProperty(name + ".remote", Long.toString(remoteMod));
+        try (OutputStream out = new java.io.FileOutputStream(new java.io.File(appDir(), SYNC_STATE_FILE))) {
+            p.store(out, "Statmaxxer Google Drive sync markers");
+        } catch (Exception ignore) { /* non-fatal */ }
+    }
+
+    /** Removes a file's sync markers so the next sync treats it as needing fresh reconciliation. */
+    private static synchronized void clearMarker(String name) {
+        Properties p = loadState();
+        p.remove(name + ".md5");
+        p.remove(name + ".remote");
         try (OutputStream out = new java.io.FileOutputStream(new java.io.File(appDir(), SYNC_STATE_FILE))) {
             p.store(out, "Statmaxxer Google Drive sync markers");
         } catch (Exception ignore) { /* non-fatal */ }
