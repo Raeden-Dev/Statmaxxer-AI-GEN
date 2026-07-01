@@ -1,5 +1,6 @@
 package com.raeden.ors_to_do.modules.dependencies.ui.layout;
 
+import com.raeden.ors_to_do.TaskTrackerApp;
 import com.raeden.ors_to_do.dependencies.models.AppStats;
 import com.raeden.ors_to_do.dependencies.models.CalendarEntry;
 import com.raeden.ors_to_do.dependencies.models.CalendarTask;
@@ -49,6 +50,7 @@ public class CalendarPage extends BorderPane {
     private CalendarTask brushTask;
     private CalendarTask displayFilter;
     private LocalDate selectedDate; // Journal-Only: the day whose entries the bottom panel shows
+    private String entryTagFilter;  // Journal-Only: active tag filter for the day-detail list (null = All)
 
     private final Label titleLabel = new Label();
     private final Label monthLabel = new Label();
@@ -729,13 +731,56 @@ public class CalendarPage extends BorderPane {
 
         List<CalendarEntry> entries = config.getDayEntries(iso);
         if (entries.isEmpty()) {
+            entryTagFilter = null;
             Label none = new Label(Lang.CAL_NO_ENTRIES_FOR_DAY.get());
             none.setStyle("-fx-text-fill: #777777; -fx-font-style: italic;");
             none.setWrapText(true);
             taskListBox.getChildren().add(none);
-        } else {
-            for (CalendarEntry en : entries) taskListBox.getChildren().add(buildEntryCard(selectedDate, en));
+            return;
         }
+
+        // Distinct tags present today (log / event / each custom scenario tag). When there's more
+        // than one, offer a filter so a busy day can be narrowed to a single tag.
+        java.util.LinkedHashSet<String> tags = new java.util.LinkedHashSet<>();
+        for (CalendarEntry en : entries) tags.add(entryTagLabel(en));
+        // Self-correct a stale filter left over from another day that lacks this tag.
+        if (entryTagFilter != null && !tags.contains(entryTagFilter)) entryTagFilter = null;
+
+        if (tags.size() > 1) {
+            ComboBox<String> tagFilter = new ComboBox<>();
+            tagFilter.getItems().add(Lang.CAL_FILTER_SHOW_ALL.get());
+            tagFilter.getItems().addAll(tags);
+            tagFilter.setValue(entryTagFilter == null ? Lang.CAL_FILTER_SHOW_ALL.get() : entryTagFilter);
+            tagFilter.getStylesheets().add(css(COMBO_CSS));
+            tagFilter.setStyle("-fx-background-color: #2D2D30; -fx-border-color: #555555; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand;");
+            tagFilter.setOnAction(e -> {
+                String v = tagFilter.getValue();
+                entryTagFilter = (v == null || v.equals(Lang.CAL_FILTER_SHOW_ALL.get())) ? null : v;
+                renderTaskList();
+            });
+            Label fl = new Label(Lang.CAL_LBL_FILTER_BY_TAG.get()); fl.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 12px;");
+            HBox filterRow = new HBox(8, fl, tagFilter);
+            filterRow.setAlignment(Pos.CENTER_LEFT);
+            taskListBox.getChildren().add(filterRow);
+        }
+
+        int shown = 0;
+        for (CalendarEntry en : entries) {
+            if (entryTagFilter != null && !entryTagLabel(en).equals(entryTagFilter)) continue;
+            taskListBox.getChildren().add(buildEntryCard(selectedDate, en));
+            shown++;
+        }
+        if (shown == 0) {
+            Label none = new Label(Lang.CAL_NO_ENTRIES_FOR_TAG.get());
+            none.setStyle("-fx-text-fill: #777777; -fx-font-style: italic;");
+            taskListBox.getChildren().add(none);
+        }
+    }
+
+    /** The tag shown on an entry card: the custom scenario tag, or the fixed "event" / "log" tag. */
+    private String entryTagLabel(CalendarEntry e) {
+        if (e.isScenario()) return e.getTagLabel().isBlank() ? Lang.CAL_ENTRY_TAG_SCENARIO.get() : e.getTagLabel();
+        return e.isEvent() ? Lang.CAL_ENTRY_TAG_EVENT.get() : Lang.CAL_ENTRY_TAG_LOG.get();
     }
 
     /** Entry card layout: [type tag] [icon] [colored rectangle spanning the card height] [text]. */
@@ -754,13 +799,7 @@ public class CalendarPage extends BorderPane {
         card.setStyle(cardStyle);
 
         // 1. Entry-type tag (event / log / custom scenario)
-        String tagText;
-        if (entry.isScenario()) {
-            tagText = entry.getTagLabel().isBlank() ? Lang.CAL_ENTRY_TAG_SCENARIO.get() : entry.getTagLabel();
-        } else {
-            tagText = entry.isEvent() ? Lang.CAL_ENTRY_TAG_EVENT.get() : Lang.CAL_ENTRY_TAG_LOG.get();
-        }
-        Label tag = new Label(tagText);
+        Label tag = new Label(entryTagLabel(entry));
         tag.setMinWidth(Region.USE_PREF_SIZE);
         tag.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 10px; -fx-font-weight: bold; -fx-background-color: derive(" + accent + ", -80%); -fx-border-color: " + accent + "; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 1 7;");
 
@@ -777,8 +816,10 @@ public class CalendarPage extends BorderPane {
         rect.setMaxHeight(Double.MAX_VALUE);
         rect.setStyle("-fx-background-color: " + rectColor + "; -fx-background-radius: 3;");
 
-        // 4. Text — a read-only but selectable box so it can be highlighted and copied with Ctrl+C.
-        TextArea body = com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.selectableArea(entry.getText(), "#E0E0E0", 12, false);
+        // 4. Text
+        Label body = new Label(entry.getText());
+        body.setStyle("-fx-text-fill: #E0E0E0; -fx-font-size: 12px;");
+        body.setWrapText(true);
         body.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(body, Priority.ALWAYS);
 
@@ -790,20 +831,23 @@ public class CalendarPage extends BorderPane {
 
         card.getChildren().addAll(tag, ico, rect, body, gear);
 
-        // Double-click opens the editor (a single click now lands in the selectable text box);
-        // the gear button and right-click "Edit" remain one-click.
-        card.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY && e.getClickCount() == 2) showEntryEditDialog(date, entry, kindOf(entry)); });
+        // Click opens the editor (the gear button and right-click "Edit" do the same).
+        card.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) showEntryEditDialog(date, entry, kindOf(entry)); });
 
         ContextMenu menu = new ContextMenu();
-        MenuItem copyItem = new MenuItem("Copy Text");
-        copyItem.setOnAction(e -> com.raeden.ors_to_do.modules.dependencies.ui.utils.TextCopyUtil.copyToClipboard(entry.getText()));
         MenuItem editItem = new MenuItem(Lang.CAL_MENU_EDIT_ENTRY.get());
         editItem.setOnAction(e -> showEntryEditDialog(date, entry, kindOf(entry)));
         MenuItem delItem = new MenuItem(Lang.CAL_MENU_DELETE_ENTRY.get());
         delItem.setOnAction(e -> {
+            int originalIndex = config.getDayEntries(iso).indexOf(entry);
             config.removeDayEntry(iso, entry.getId());
             StorageManager.saveStats(appStats);
             renderCalendar(); renderTaskList();
+            Toast.showUndo(Lang.CAL_TOAST_ENTRY_DELETED.get(), () -> {
+                config.insertDayEntry(iso, originalIndex, entry);
+                StorageManager.saveStats(appStats);
+                renderCalendar(); renderTaskList();
+            });
         });
         // Convert log <-> event in place (keeps text/styling). Scenarios carry their own tag, so
         // they aren't part of the log/event toggle.
@@ -814,9 +858,9 @@ public class CalendarPage extends BorderPane {
                 StorageManager.saveStats(appStats);
                 renderCalendar(); renderTaskList();
             });
-            menu.getItems().addAll(copyItem, editItem, convertItem, delItem);
+            menu.getItems().addAll(editItem, convertItem, delItem);
         } else {
-            menu.getItems().addAll(copyItem, editItem, delItem);
+            menu.getItems().addAll(editItem, delItem);
         }
         card.setOnContextMenuRequested(e -> menu.show(card, e.getScreenX(), e.getScreenY()));
 
@@ -1065,16 +1109,78 @@ public class CalendarPage extends BorderPane {
         delBtn.setOnAction(e -> {
             StylePreset p = presetBox.getValue();
             if (p == null) return;
+            int idx = presets.indexOf(p);
             presets.remove(p);
             presetBox.getItems().remove(p);
             presetBox.setValue(null);
             StorageManager.saveStats(appStats);
+            Toast.showUndo(Lang.CAL_TOAST_PRESET_DELETED.get(p.getName()), () -> {
+                presets.add(Math.min(Math.max(0, idx), presets.size()), p);
+                presetBox.getItems().setAll(presets);
+                presetBox.setValue(p);
+                StorageManager.saveStats(appStats);
+            });
         });
 
-        HBox row = new HBox(8, presetBox, saveBtn, editBtn, delBtn);
+        // Compact export/import so presets can be shared between profiles/machines.
+        MenuButton ioBtn = new MenuButton("⇄");
+        ioBtn.getStyleClass().add("custom-menu-btn");
+        ioBtn.setStyle(darkControl);
+        ioBtn.getStylesheets().add(css(COMBO_CSS));
+        Tooltip.install(ioBtn, new Tooltip("Export all presets to a file, or import from one"));
+        MenuItem exportItem = new MenuItem("Export All…");
+        exportItem.setOnAction(e -> exportStylePresets(presets));
+        MenuItem importItem = new MenuItem("Import…");
+        importItem.setOnAction(e -> importStylePresets(presets, presetBox));
+        ioBtn.getItems().addAll(exportItem, importItem);
+
+        HBox row = new HBox(8, presetBox, saveBtn, editBtn, delBtn, ioBtn);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setMaxWidth(Double.MAX_VALUE);
         return row;
+    }
+
+    /** Writes the given style-preset list to a user-chosen JSON file. */
+    private void exportStylePresets(List<StylePreset> presets) {
+        if (presets.isEmpty()) { Toast.showMessage("No presets to export."); return; }
+        javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+        fc.setTitle("Export Style Presets");
+        fc.setInitialFileName("style_presets.json");
+        fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("JSON", "*.json"));
+        java.io.File file = fc.showSaveDialog(TaskTrackerApp.MAIN_STAGE);
+        if (file == null) return;
+        try (java.io.Writer w = new java.io.FileWriter(file)) {
+            new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(presets, w);
+            Toast.showMessage("Exported " + presets.size() + " preset" + (presets.size() == 1 ? "" : "s") + ".");
+        } catch (Exception ex) {
+            Toast.showMessage("Export failed: " + ex.getMessage());
+        }
+    }
+
+    /** Loads presets from a user-chosen JSON file, appending them (with fresh ids) to the list. */
+    private void importStylePresets(List<StylePreset> presets, ComboBox<StylePreset> presetBox) {
+        javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+        fc.setTitle("Import Style Presets");
+        fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("JSON", "*.json"));
+        java.io.File file = fc.showOpenDialog(TaskTrackerApp.MAIN_STAGE);
+        if (file == null) return;
+        try (java.io.Reader r = new java.io.FileReader(file)) {
+            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<List<StylePreset>>() {}.getType();
+            List<StylePreset> imported = new com.google.gson.Gson().fromJson(r, type);
+            if (imported == null || imported.isEmpty()) { Toast.showMessage("No presets found in that file."); return; }
+            int added = 0;
+            for (StylePreset p : imported) {
+                if (p == null || p.getName() == null) continue;
+                p.setId(java.util.UUID.randomUUID().toString()); // avoid id collisions with existing presets
+                presets.add(p);
+                added++;
+            }
+            presetBox.getItems().setAll(presets);
+            StorageManager.saveStats(appStats);
+            Toast.showMessage("Imported " + added + " preset" + (added == 1 ? "" : "s") + ".");
+        } catch (Exception ex) {
+            Toast.showMessage("Import failed: " + ex.getMessage());
+        }
     }
 
     private Region buildAddCard(boolean columnMode) {
@@ -1153,6 +1259,12 @@ public class CalendarPage extends BorderPane {
             row.setPadding(new Insets(10, 12, 10, 12));
             row.setStyle(base);
             card = row;
+        }
+
+        // Per-Column tiles are fixed-height and can clip a long name/summary; a tooltip recovers the
+        // full text on hover.
+        if (columnMode) {
+            Tooltip.install(card, new Tooltip(t.getName() + (summary.isEmpty() ? "" : "\n" + summary)));
         }
 
         // Left-click selects the brush (click again to deselect). Right-click is reserved for the
@@ -1235,6 +1347,13 @@ public class CalendarPage extends BorderPane {
     }
 
     private void deleteTask(CalendarTask t) {
+        // Capture enough to undo: the card's position and which days it had been marked on.
+        int originalIndex = config.getCalendarTasks().indexOf(t);
+        List<String> markedDays = new ArrayList<>();
+        for (var en : config.getCalendarCompletions().entrySet()) {
+            if (en.getValue().contains(t.getId())) markedDays.add(en.getKey());
+        }
+
         config.getCalendarTasks().removeIf(x -> x.getId().equals(t.getId()));
         config.getCalendarCompletions().values().forEach(ids -> ids.remove(t.getId()));
         config.getCalendarCompletions().entrySet().removeIf(en -> en.getValue().isEmpty());
@@ -1242,6 +1361,16 @@ public class CalendarPage extends BorderPane {
         if (displayFilter != null && displayFilter.getId().equals(t.getId())) displayFilter = null;
         StorageManager.saveStats(appStats);
         refreshFilterBox(); renderTaskList(); renderCalendar();
+
+        Toast.showUndo(Lang.CAL_TOAST_TASK_DELETED.get(t.getName()), () -> {
+            List<CalendarTask> list = config.getCalendarTasks();
+            list.add(Math.min(Math.max(0, originalIndex), list.size()), t);
+            for (String day : markedDays) {
+                config.getCalendarCompletions().computeIfAbsent(day, k -> new ArrayList<>()).add(t.getId());
+            }
+            StorageManager.saveStats(appStats);
+            refreshFilterBox(); renderTaskList(); renderCalendar();
+        });
     }
 
     private void refreshFilterBox() {

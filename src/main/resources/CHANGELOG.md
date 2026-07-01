@@ -5,6 +5,63 @@ All notable changes to the project are recorded here, newest first. Dates use IS
 
 ---
 
+## v1.488 — 2026-07-02
+
+### Added
+- **Custom Scenario entries (Calendar Journal-Only).** Alongside **Add Journal Entry** and **Add
+  Event**, days now offer **＋ Add Custom Scenario** (also in a day's right-click menu). A scenario is
+  a journal card with a **user-defined tag name** and **tag colour** instead of the fixed `log` /
+  `event` tag — so you can label days with your own categories (e.g. *Workout*, *Travel*, *Sick
+  Day*). The editor includes Randomize Style, which also rolls a tag colour.
+- **Filter journal entries by tag.** When a day holds entries with more than one tag, the day-detail
+  panel shows a **Filter** dropdown to narrow the list to a single tag (log / event / any scenario).
+- **Undo for deletions.** Deleting a journal/event/scenario entry, a calendar task, or a style preset
+  now shows an **Undo** toast that restores it (at its original position, including a calendar task's
+  day marks) — matching the existing undo for regular tasks.
+- **Export / import style presets.** The **Style Preset** row has a new **⇄** menu to export all
+  presets to a JSON file or import them from one (imported presets get fresh ids), so looks can be
+  shared between profiles or machines.
+- **Reset Style.** The **Customize Day** dialog has a **↺ Reset Style** button that clears the day's
+  icon and (in Journal-Only mode) its background/outline back to default. A matching **Reset Day
+  Style** item also appears in a day's right-click menu when the day has any custom styling.
+- **Edit / delete style presets.** The **Style Preset** row now has **✎** (rename the selected preset
+  and update it to the current style) and **🗑** (delete the selected preset) buttons next to **Save**.
+
+### Changed
+- **Style Preset row moved to the top** of the Customize Day and journal/event/scenario editors
+  (above *Icon & Color*).
+- **Uniform dialog controls.** The Background Color, Outline Color, Icon & Color, preset, and
+  Randomize/Reset controls in the Customize Day and entry editors now all stretch to the same width
+  (to the right edge), instead of the colour pickers being narrower than the buttons.
+- **Storage write failures are now surfaced.** A locked database or full disk previously failed a
+  save silently (stderr only); a throttled toast now warns that the last change may not have saved.
+- **Focus-timer task search** no longer force-opens its dropdown on every keystroke — it only opens
+  while actively narrowing with a query.
+
+### Fixed
+- **Focus timer double-granted stat rewards.** Completing a timed task via the Pomodoro timer applied
+  its stat rewards twice (and applied them even if a confirmation prompt was declined). It now applies
+  them once through the normal completion path.
+- **Global score could go negative.** Un-checking or decrementing a rewarded task subtracted its
+  points without a floor, so if the points had been spent the score went below zero. Reversals now
+  floor at 0 and log the actual delta.
+- **Weekly history only recorded one section.** With more than one streak section, each overwrote the
+  same day's history entry; the daily-completion chart now records the aggregate across all streak
+  sections. The detailed history log is also trimmed to the retained window (it grew unbounded).
+- **Lifetime "earned" over-counted capped rewards.** `gain()`/`drain()` now report the amount
+  actually applied, so a reward discarded at the stat cap no longer inflates lifetime totals.
+- **Per-Column task tiles no longer shift size.** In the Task List *Per Column* view, tile height was
+  bound to tile width, so resizing the window resized every tile. Tiles now use a fixed, uniform
+  height and only flex in width with the available space; a hover tooltip shows the full text if a
+  long name/summary is clipped.
+
+### Reverted
+- **Journal/event card text is a plain label again.** The selectable text box added in v1.487 (which
+  showed a grey rectangle on each card and allowed in-card text selection/copy) has been removed,
+  along with the card's right-click **Copy Text** option. Clicking a card opens its editor as before.
+
+---
+
 ## v1.48 — 2026-06-23
 
 ### Added

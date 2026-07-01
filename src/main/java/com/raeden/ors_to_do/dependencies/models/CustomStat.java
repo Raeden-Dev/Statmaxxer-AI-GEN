@@ -160,23 +160,38 @@ public class CustomStat implements Serializable {
     /**
      * Adds {@code amount} to this stat — through the EXP pool when EXP leveling is on, otherwise
      * directly to the point value (clamped to {@code effectiveCap}).
+     *
+     * @return the amount actually credited. For a non-EXP stat this is the real point increase
+     *         (0 when already at the cap), so callers can track "lifetime earned" accurately
+     *         instead of counting rewards that were discarded at the cap.
      */
-    public void gain(int amount, int effectiveCap) {
-        if (amount <= 0) return;
+    public int gain(int amount, int effectiveCap) {
+        if (amount <= 0) return 0;
         if (useExp) {
             addExp(amount, effectiveCap);
-        } else {
-            int n = currentAmount + amount;
-            if (effectiveCap > 0 && n > effectiveCap) n = effectiveCap;
-            currentAmount = n;
-            if (currentAmount > maxLevelReached) maxLevelReached = currentAmount;
+            return amount;
         }
+        int before = currentAmount;
+        int n = currentAmount + amount;
+        if (effectiveCap > 0 && n > effectiveCap) n = effectiveCap;
+        currentAmount = n;
+        if (currentAmount > maxLevelReached) maxLevelReached = currentAmount;
+        return currentAmount - before;
     }
 
-    /** Subtracts {@code amount} — through EXP when enabled, otherwise directly (floored at 0). */
-    public void drain(int amount, int effectiveCap) {
-        if (amount <= 0) return;
-        if (useExp) addExp(-amount, effectiveCap);
-        else currentAmount = Math.max(0, currentAmount - amount);
+    /**
+     * Subtracts {@code amount} — through EXP when enabled, otherwise directly (floored at 0).
+     *
+     * @return the amount actually removed (for a non-EXP stat, capped by the floor at 0).
+     */
+    public int drain(int amount, int effectiveCap) {
+        if (amount <= 0) return 0;
+        if (useExp) {
+            addExp(-amount, effectiveCap);
+            return amount;
+        }
+        int before = currentAmount;
+        currentAmount = Math.max(0, currentAmount - amount);
+        return before - currentAmount;
     }
 }

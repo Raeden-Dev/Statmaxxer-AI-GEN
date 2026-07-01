@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class TaskTrackerApp extends Application {
-    public static final String APP_VERSION = "v1.487";
+    public static final String APP_VERSION = "v1.49";
 
     private List<TaskItem> taskDatabase;
     private AppStats appStats;
@@ -131,6 +131,11 @@ public class TaskTrackerApp extends Application {
         }
         Platform.setImplicitExit(false);
         SystemTrayManager.setupSystemTray(primaryStage, this::shutdownApp);
+
+        // Surface storage write failures to the user instead of only logging to stderr, so a locked
+        // DB or full disk doesn't silently drop their changes. Throttled inside StorageManager.
+        StorageManager.setErrorListener(msg -> Platform.runLater(() ->
+                com.raeden.ors_to_do.modules.dependencies.ui.layout.Toast.showMessage("⚠ " + msg)));
 
         primaryStage.setOnCloseRequest(event -> {
             DailyRolloverManager.autoArchiveTasks(appStats, taskDatabase);

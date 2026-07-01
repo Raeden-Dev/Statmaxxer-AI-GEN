@@ -25,6 +25,11 @@ public class DailyRolloverManager {
             long daysMissed = ChronoUnit.DAYS.between(lastOpened, today);
             boolean penaltyApplied = false;   // accumulates across all reset sections
 
+            // Aggregate the day's completion across every streak section so the history chart
+            // reflects the whole day, not just the last-processed section (see recordDailyHistory).
+            int aggTotalDaily = 0;
+            int aggCompletedDaily = 0;
+
             for (SectionConfig section : appStats.getSections()) {
                 if (section.getResetIntervalHours() > 0) {
 
@@ -40,8 +45,8 @@ public class DailyRolloverManager {
 
                     if (section.isHasStreak() && totalDaily > 0) {
                         double percentComplete = (double) completedDaily / totalDaily;
-                        appStats.addHistoryRecord(lastOpened, percentComplete);
-                        appStats.getAdvancedHistoryLog().put(lastOpened, new int[]{totalDaily, completedDaily});
+                        aggTotalDaily += totalDaily;
+                        aggCompletedDaily += completedDaily;
 
                         double requiredFraction = appStats.getMinDailyCompletionPercent() / 100.0;
 
@@ -145,6 +150,12 @@ public class DailyRolloverManager {
                         taskDatabase.add(newTask);
                     }
                 }
+            }
+
+            // One aggregate history entry for the day that just ended, summed across all streak
+            // sections (and trimmed to the retained window inside recordDailyHistory).
+            if (aggTotalDaily > 0) {
+                appStats.recordDailyHistory(lastOpened, aggTotalDaily, aggCompletedDaily);
             }
 
             // Re-check threshold auras once if any reset miss-penalty moved a stat across a

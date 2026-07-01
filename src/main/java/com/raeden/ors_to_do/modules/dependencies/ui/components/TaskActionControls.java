@@ -117,10 +117,13 @@ public class TaskActionControls extends HBox {
             minusBtn.setOnAction(e -> {
                 if (task.getCurrentCount() > 0) {
                     if (task.isPointsClaimed()) {
-                        appStats.setGlobalScore(appStats.getGlobalScore() - task.getRewardPoints());
-                        if (task.getRewardPoints() != 0) {
+                        int scoreBefore = appStats.getGlobalScore();
+                        int scoreAfter = Math.max(0, scoreBefore - task.getRewardPoints());
+                        appStats.setGlobalScore(scoreAfter);
+                        int scoreDelta = scoreAfter - scoreBefore;
+                        if (scoreDelta != 0) {
                             appStats.recordStatChange(com.raeden.ors_to_do.dependencies.models.StatLedgerEntry.GLOBAL_SCORE,
-                                    -task.getRewardPoints(), "pts",
+                                    scoreDelta, "pts",
                                     "Reverted: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent()));
                         }
                         if (config != null && config.isEnableStatsSystem()) {
@@ -175,10 +178,13 @@ public class TaskActionControls extends HBox {
                     if (config != null && config.isEnableStatsSystem()) { StorageManager.saveStats(appStats); }
                 } else {
                     if (task.isPointsClaimed()) {
-                        appStats.setGlobalScore(appStats.getGlobalScore() - task.getRewardPoints());
-                        if (task.getRewardPoints() != 0) {
+                        int scoreBefore = appStats.getGlobalScore();
+                        int scoreAfter = Math.max(0, scoreBefore - task.getRewardPoints());
+                        appStats.setGlobalScore(scoreAfter);
+                        int scoreDelta = scoreAfter - scoreBefore;
+                        if (scoreDelta != 0) {
                             appStats.recordStatChange(com.raeden.ors_to_do.dependencies.models.StatLedgerEntry.GLOBAL_SCORE,
-                                    -task.getRewardPoints(), "pts",
+                                    scoreDelta, "pts",
                                     "Reverted: " + (task.getTextContent() == null || task.getTextContent().isBlank() ? "Task" : task.getTextContent()));
                         }
                         if (config != null && config.isEnableStatsSystem()) {

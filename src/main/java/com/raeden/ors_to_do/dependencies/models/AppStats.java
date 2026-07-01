@@ -424,11 +424,33 @@ public class AppStats implements Serializable {
     }
     public void setFocusStatRewards(java.util.Map<String, Integer> focusStatRewards) { this.focusStatRewards = focusStatRewards; }
 
+    /** Days of daily-completion history kept in each log (both the summary and detailed maps). */
+    private static final int HISTORY_CAP = 7;
+
     public void addHistoryRecord(LocalDate date, double completionPercentage) {
         historyLog.put(date, completionPercentage);
-        if (historyLog.size() > 7) {
-            LocalDate oldestDate = historyLog.keySet().iterator().next();
-            historyLog.remove(oldestDate);
+        trimHistory(historyLog);
+    }
+
+    /**
+     * Records one day's <b>aggregate</b> task completion (summed across all streak sections) into
+     * both the summary and detailed history logs, keeping only the most recent {@link #HISTORY_CAP}
+     * days in each. Previously the daily rollover wrote per-section, so with more than one streak
+     * section only the last-processed section survived for that day, and the detailed log was never
+     * trimmed (it grew without bound).
+     */
+    public void recordDailyHistory(LocalDate date, int totalDaily, int completedDaily) {
+        double pct = totalDaily > 0 ? (double) completedDaily / totalDaily : 0.0;
+        historyLog.put(date, pct);
+        advancedHistoryLog.put(date, new int[]{totalDaily, completedDaily});
+        trimHistory(historyLog);
+        trimHistory(advancedHistoryLog);
+    }
+
+    private static void trimHistory(Map<LocalDate, ?> log) {
+        while (log.size() > HISTORY_CAP) {
+            LocalDate oldest = log.keySet().iterator().next();
+            log.remove(oldest);
         }
     }
 

@@ -19,6 +19,11 @@ public final class Toast {
 
     private Toast() { }
 
+    /** Shows a plain informational toast (dismiss only, no Undo action). */
+    public static void showMessage(String message) {
+        showUndo(message, null);
+    }
+
     /** Shows a toast with an Undo button. {@code onUndo} runs if the user clicks Undo before it fades. */
     public static void showUndo(String message, Runnable onUndo) {
         Stage owner = TaskTrackerApp.MAIN_STAGE;

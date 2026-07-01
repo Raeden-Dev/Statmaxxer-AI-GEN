@@ -258,6 +258,11 @@ public class SectionConfig implements Serializable {
     public void addDayEntry(String isoDate, CalendarEntry entry) {
         getCalendarEntries().computeIfAbsent(isoDate, k -> new ArrayList<>()).add(entry);
     }
+    /** Re-inserts an entry at a specific index (used to undo a deletion at its original position). */
+    public void insertDayEntry(String isoDate, int index, CalendarEntry entry) {
+        List<CalendarEntry> list = getCalendarEntries().computeIfAbsent(isoDate, k -> new ArrayList<>());
+        list.add(Math.min(Math.max(0, index), list.size()), entry);
+    }
     public void removeDayEntry(String isoDate, String entryId) {
         List<CalendarEntry> list = getCalendarEntries().get(isoDate);
         if (list == null) return;

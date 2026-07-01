@@ -61,6 +61,27 @@ public class StorageManager {
     }
 
     /**
+     * Optional listener invoked when a write to the local DB fails, so the UI can warn the user that
+     * their latest change may not have been saved (instead of the failure only reaching stderr).
+     */
+    private static volatile java.util.function.Consumer<String> errorListener;
+    private static volatile long lastErrorNotifyMs = 0;
+    private static final long ERROR_NOTIFY_THROTTLE_MS = 15_000;
+
+    /** Registers a callback invoked (throttled) when a local write fails. */
+    public static void setErrorListener(java.util.function.Consumer<String> listener) { errorListener = listener; }
+
+    private static void notifyError(String friendlyMessage, Throwable cause) {
+        System.err.println("[StorageManager] " + friendlyMessage + (cause != null ? " (" + cause.getMessage() + ")" : ""));
+        java.util.function.Consumer<String> l = errorListener;
+        if (l == null) return;
+        long now = System.currentTimeMillis();
+        if (now - lastErrorNotifyMs < ERROR_NOTIFY_THROTTLE_MS) return; // don't spam on repeated failures
+        lastErrorNotifyMs = now;
+        try { l.accept(friendlyMessage); } catch (Throwable ignore) { }
+    }
+
+    /**
      * Active profile id. Each profile is a fully separate "world" backed by its own DB file. The
      * built-in {@code "default"} profile keeps the original {@code tasktracker.db} filename so
      * existing installs are unaffected; other profiles live in {@code tasktracker_<id>.db}.
@@ -98,7 +119,7 @@ public class StorageManager {
             TaskRepository.saveAll(db, tasks == null ? new ArrayList<>() : tasks);
             notifyChanged();
         } catch (SQLException e) {
-            System.err.println("[StorageManager] saveTasks failed: " + e.getMessage());
+            notifyError("Couldn't save your tasks — the last change may be lost. Check the data folder / disk.", e);
         }
     }
 
@@ -119,7 +140,7 @@ public class StorageManager {
             AppMetaRepository.save(db, stats);
             notifyChanged();
         } catch (SQLException e) {
-            System.err.println("[StorageManager] saveStats failed: " + e.getMessage());
+            notifyError("Couldn't save your stats/settings — the last change may be lost. Check the data folder / disk.", e);
         }
     }
 

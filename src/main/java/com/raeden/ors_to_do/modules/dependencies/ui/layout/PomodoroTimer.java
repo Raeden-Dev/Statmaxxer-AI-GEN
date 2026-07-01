@@ -308,7 +308,9 @@ public class PomodoroTimer extends VBox {
             taskSelector.setValue(taskSelector.getItems().get(0));
         }
 
-        if (taskSearchField.isFocused() && !taskSelector.getItems().isEmpty()) {
+        // Only auto-open the dropdown while the user is actively narrowing with a query — popping it
+        // open on every keystroke (including when the field is cleared) was disruptive.
+        if (taskSearchField.isFocused() && query != null && !query.trim().isEmpty() && !taskSelector.getItems().isEmpty()) {
             taskSelector.show();
         }
     }
@@ -367,10 +369,11 @@ public class PomodoroTimer extends VBox {
                         lastTrackedTimeLeft = timeLeft;
 
                         SectionConfig taskConfig = appStats.getSections().stream().filter(c -> c.getId().equals(activeTask.getSectionId())).findFirst().orElse(null);
+                        // handleTaskCompletion already applies stat rewards (via finalizeCompletion),
+                        // honouring any confirmation prompt. We only persist here — re-running
+                        // processRPGStats would double-grant XP and apply it even if the prompt was declined.
                         com.raeden.ors_to_do.modules.dependencies.ui.utils.TaskActionHandler.handleTaskCompletion(activeTask, taskConfig, appStats, globalDatabase, refreshCallback, null);
-
                         if (taskConfig != null && taskConfig.isEnableStatsSystem()) {
-                            com.raeden.ors_to_do.modules.dependencies.ui.utils.TaskActionHandler.processRPGStats(activeTask, appStats, true);
                             StorageManager.saveStats(appStats);
                         }
 
@@ -399,8 +402,8 @@ public class PomodoroTimer extends VBox {
                         for (Map.Entry<String, Integer> entry : appStats.getFocusStatRewards().entrySet()) {
                             CustomStat stat = appStats.getCustomStats().stream().filter(s -> s.getId().equals(entry.getKey())).findFirst().orElse(null);
                             if (stat != null && entry.getValue() != null && entry.getValue() != 0) {
-                                stat.gain(entry.getValue(), stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
-                                stat.setLifetimeEarned(stat.getLifetimeEarned() + entry.getValue());
+                                int applied = stat.gain(entry.getValue(), stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
+                                stat.setLifetimeEarned(stat.getLifetimeEarned() + applied);
                                 appStats.recordStatChange(stat.getName(), entry.getValue(), stat.isUseExp() ? "XP" : "pts", "Focus Session");
                                 earnedRewards = true;
                             }

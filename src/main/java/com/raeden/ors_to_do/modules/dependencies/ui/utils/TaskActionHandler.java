@@ -297,8 +297,8 @@ public class TaskActionHandler {
             for (CustomStat stat : appStats.getCustomStats()) {
                 int pen = getStatValue(task.getStatPenalties(), stat);
                 if (pen > 0) {
-                    stat.drain(pen, stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
-                    stat.setLifetimeLost(stat.getLifetimeLost() + pen);
+                    int removed = stat.drain(pen, stat.getEffectiveMaxCap(appStats.getActiveDebuffs()));
+                    stat.setLifetimeLost(stat.getLifetimeLost() + removed);
                     appStats.recordStatChange(stat.getName(), -pen, stat.isUseExp() ? "XP" : "pts", missSource);
                 }
             }
@@ -352,24 +352,25 @@ public class TaskActionHandler {
 
                 if (rewardAmt > 0) {
                     // Routes through the EXP pool when EXP leveling is on; otherwise adds points
-                    // directly (clamped to the cap). gain() also tracks the peak level.
-                    stat.gain(rewardAmt, effectiveCap);
-                    stat.setLifetimeEarned(stat.getLifetimeEarned() + rewardAmt);
+                    // directly (clamped to the cap). gain() also tracks the peak level and returns
+                    // the amount actually credited, so lifetime totals don't count capped surplus.
+                    int applied = stat.gain(rewardAmt, effectiveCap);
+                    stat.setLifetimeEarned(stat.getLifetimeEarned() + applied);
                     appStats.getLastStatGainDates().put(stat.getId(), java.time.LocalDate.now());
                     appStats.recordStatChange(stat.getName(), rewardAmt, ledgerUnit, baseSource);
                 }
 
                 if (costAmt > 0) {
-                    stat.drain(costAmt, effectiveCap);
-                    stat.setLifetimeLost(stat.getLifetimeLost() + costAmt);
+                    int removed = stat.drain(costAmt, effectiveCap);
+                    stat.setLifetimeLost(stat.getLifetimeLost() + removed);
                     appStats.recordStatChange(stat.getName(), -costAmt, ledgerUnit, baseSource);
                 }
 
             } else {
                 String revSource = "Reverted: " + baseSource;
                 if (rewardAmt > 0) {
-                    stat.drain(rewardAmt, effectiveCap);
-                    stat.setLifetimeLost(stat.getLifetimeLost() + rewardAmt);
+                    int removed = stat.drain(rewardAmt, effectiveCap);
+                    stat.setLifetimeLost(stat.getLifetimeLost() + removed);
                     appStats.recordStatChange(stat.getName(), -rewardAmt, ledgerUnit, revSource);
                 }
 
